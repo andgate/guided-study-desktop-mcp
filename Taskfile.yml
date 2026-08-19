@@ -1,0 +1,33 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Install the locked Python environment
+    cmds:
+      - uv sync --project converter --locked
+
+  build:
+    desc: Build the Windows desktop application
+    platforms: [windows]
+    cmds:
+      - mkdir -p bin
+      - go build -trimpath -ldflags="-H=windowsgui -s -w" -o bin/guided-study.exe ./cmd/guided-study
+
+  test:
+    desc: Run the Go and Python tests
+    cmds:
+      - task: format:check
+      - go test ./...
+      - uv run --project converter --locked python -m unittest discover -s converter -p "test_*.py" -v
+
+  format:
+    desc: Format Go and Python source files
+    cmds:
+      - go fmt ./...
+      - uv run --project converter --locked ruff format converter
+
+  format:check:
+    desc: Check Go and Python formatting without changing files
+    cmds:
+      - powershell -NoProfile -Command '$unformatted = gofmt -l (Get-ChildItem cmd,internal -Recurse -Filter *.go).FullName; if ($unformatted) { $unformatted; exit 1 }'
+      - uv run --project converter --locked ruff format --check converter
