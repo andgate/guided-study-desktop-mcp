@@ -1,4 +1,0 @@
-interface:
-  display_name: "Diff Walkthrough"
-  short_description: "Walk through unstaged code one piece at a time"
-  default_prompt: "Use $diff-walkthrough to walk me through this repository's unstaged changes one piece at a time."

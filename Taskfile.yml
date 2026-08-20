@@ -6,7 +6,14 @@ tasks:
     platforms: [windows]
     cmds:
       - mkdir -p bin
-      - go build -trimpath -ldflags="-H=windowsgui -s -w" -o bin/guided-study.exe ./cmd/guided-study
+      - go build -v -trimpath -ldflags="-H=windowsgui -s -w" -o bin/guided-study.exe ./cmd/guided-study
+
+  clean:
+    desc: Remove temporary files, build artifacts, and the Go build cache
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -Command '$root = (Get-Location).Path; foreach ($name in @("bin", ".cache")) { $target = [IO.Path]::GetFullPath((Join-Path $root $name)); if ([IO.Path]::GetDirectoryName($target) -ne $root) { throw "Unsafe clean target $target" }; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force } }'
+      - go clean -cache
 
   plugin:install:
     desc: Install or refresh the Teach plugin for the current user
