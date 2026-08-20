@@ -1,5 +1,7 @@
 # Guided Study Desktop MCP
 
+<img src="cmd/guided-study/assets/tray-icon.png" alt="Guided Study open-book tray icon" width="96">
+
 Guided Study is a local Windows application that gives an LLM deterministic tools for preparing books, navigating rendered pages, persisting independent study sessions, and maintaining revisioned flashcard decks. The LLM teaches; this service owns storage and page delivery.
 
 The version-one contract is implemented as:
@@ -16,6 +18,7 @@ The source PDF is never modified, deleted, or retained in SQLite. Failed convers
 ## Prerequisites
 
 - Windows 11
+- [Git LFS](https://git-lfs.com/) for binary application assets
 - Go 1.25 or newer for development
 - [Task](https://taskfile.dev/) v3
 - [uv](https://docs.astral.sh/uv/) 0.12.5 or newer
@@ -24,6 +27,13 @@ The source PDF is never modified, deleted, or retained in SQLite. Failed convers
 - A GCC toolchain for building Fyne on Windows
 
 The application runs `converter\prepare_book.py` directly from the repository. It looks for the script next to the executable and under the current working directory; `--converter` overrides that path. Python and Poppler are discovered next to the executable, in the Codex bundled runtime, or on `PATH`; `--python` and `--pdftoppm` override their paths.
+
+After cloning, initialize Git LFS and materialize the application assets before building:
+
+```powershell
+git lfs install
+git lfs pull
+```
 
 ## Build and run
 
