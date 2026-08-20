@@ -9,7 +9,7 @@ The version-one contract is implemented as:
 - one canonical SQLite database under `%LOCALAPPDATA%\GuidedStudy`;
 - a Python subprocess that renders PDFs through Poppler and emits temporary page images plus `toc.csv`;
 - 30 focused MCP tools covering books, reading sessions/progress, decks, and immutable card revisions;
-- an MCP-native teaching skill in [`plugin/skills/guide-book-study`](plugin/skills/guide-book-study/SKILL.md).
+- the MCP-native Teach skill in [`teach/skills/teach`](teach/skills/teach/SKILL.md).
 
 The source PDF is never modified, deleted, or retained in SQLite. Failed conversion or validation cannot expose a partial book.
 
@@ -19,6 +19,7 @@ The source PDF is never modified, deleted, or retained in SQLite. Failed convers
 - Go 1.25 or newer for development
 - [Task](https://taskfile.dev/) v3
 - [uv](https://docs.astral.sh/uv/) 0.12.5 or newer
+- Python 3.12
 - Poppler's `pdftoppm.exe`
 - A GCC toolchain for building Fyne on Windows
 
@@ -55,7 +56,6 @@ The server always refuses non-loopback addresses. It has no authentication and i
 ## Test
 
 ```powershell
-task setup
 task test
 ```
 
@@ -64,24 +64,6 @@ Format the Go and Python source files with:
 ```powershell
 task format
 ```
-
-## VS Code setup
-
-Run the project setup once from the repository root:
-
-```powershell
-task setup
-```
-
-Then configure VS Code:
-
-1. Open this repository as the workspace folder.
-2. Open the Extensions view and enter `@recommended` in its search box.
-3. Install all three workspace recommendations: Go, Python, and Ruff.
-4. Run **Developer: Reload Window** from the Command Palette.
-5. Check the Python interpreter shown in the status bar. If it is not `converter\.venv\Scripts\python.exe`, run **Python: Select Interpreter** and choose that file.
-
-The checked-in workspace settings format Go with `gofmt` and Python with Ruff when you save those source files. `task format:check` checks those two source languages.
 
 Run the executable from the repository root so it can use `converter\prepare_book.py`, or pass that script's path with `--converter`. Tests cover transactional storage, independent cursors, guarded progress logs, immutable card history, atomic batch deletion, MCP discovery/schemas/annotations, structured conflicts, and image content. The Python test verifies contiguous page output and compact TOC generation.
 
@@ -97,10 +79,22 @@ The health probe is `GET /healthz`.
 
 The `import_book.file_reference` bridge deliberately supports local filesystem paths and `file://` URLs first. Other opaque ChatGPT upload references return `file_reference_unsupported` until actual host behavior is verified. This is the one integration question intentionally left open by the contract.
 
+## Install Teach locally
+
+Connecting the MCP server exposes storage and navigation tools, but it does not install the teaching workflow. Install or refresh Teach for the current Windows user with:
+
+```powershell
+task plugin:install
+```
+
+The task runs `python scripts/install_plugin.py` in the global Python environment. It validates the skill from `teach\skills\teach` and installs it at `%USERPROFILE%\.agents\skills\teach`, making it available outside this repository. The installer does not require the Codex CLI.
+
+Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable HTTP server named `guided_study` with URL `http://127.0.0.1:7331/mcp`. Start a new conversation after installing or refreshing the plugin so the client discovers the updated skill.
+
 ## Data and recovery
 
 SQLite contains book metadata, TOC entries, rendered page BLOBs, named session cursors/logs, deck metadata, and immutable card revisions. Use any SQLite viewer for inspection. Explicit exports are not part of version one.
 
 Deleting a session, log tail, card, deck, or book is immediate and permanent. Destructive MCP annotations accurately mark those operations. Deleting an imported book never touches its original PDF.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md), [SCHEMA.md](SCHEMA.md), and [MCP.md](MCP.md) for the implementation boundaries and frozen contracts.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md), [SCHEMA.md](docs/SCHEMA.md), and [MCP.md](docs/MCP.md) for the implementation boundaries and version-one contracts.

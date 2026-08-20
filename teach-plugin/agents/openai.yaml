@@ -1,0 +1,15 @@
+interface:
+  display_name: "Teach"
+  short_description: "Learn books actively with durable progress"
+  default_prompt: "Use $teach to continue my active study session."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "guided_study"
+      description: "Local Guided Study book, progress, and flashcard service"
+      transport: "streamable_http"
+      url: "http://127.0.0.1:7331/mcp"
+
+policy:
+  allow_implicit_invocation: true

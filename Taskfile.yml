@@ -1,17 +1,18 @@
 version: '3'
 
 tasks:
-  setup:
-    desc: Install the locked Python environment
-    cmds:
-      - uv sync --project converter --locked
-
   build:
     desc: Build the Windows desktop application
     platforms: [windows]
     cmds:
       - mkdir -p bin
       - go build -trimpath -ldflags="-H=windowsgui -s -w" -o bin/guided-study.exe ./cmd/guided-study
+
+  plugin:install:
+    desc: Install or refresh the Teach plugin for the current user
+    platforms: [windows]
+    cmds:
+      - python scripts/install_plugin.py
 
   test:
     desc: Run the Go and Python tests
