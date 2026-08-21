@@ -6,7 +6,6 @@ from unittest import mock
 
 from pypdf import PdfWriter
 
-
 MODULE_PATH = Path(__file__).with_name("prepare_book.py")
 SPEC = importlib.util.spec_from_file_location("prepare_book", MODULE_PATH)
 assert SPEC and SPEC.loader
@@ -39,12 +38,21 @@ class ConverterTest(unittest.TestCase):
                 for page in range(1, 4):
                     prefix.with_name(f"{prefix.name}-{page}.jpg").write_bytes(b"jpeg")
 
-            with mock.patch.object(converter, "locate_pdftoppm", return_value="pdftoppm"), mock.patch.object(converter.subprocess, "run", side_effect=fake_run):
+            with (
+                mock.patch.object(converter, "locate_pdftoppm", return_value="pdftoppm"),
+                mock.patch.object(converter.subprocess, "run", side_effect=fake_run),
+            ):
                 pages, entries = converter.prepare(source, output, 200, 90, None)
 
             self.assertEqual((pages, entries), (3, 2))
-            self.assertEqual(sorted(path.name for path in output.glob("page-*.jpg")), ["page-0001.jpg", "page-0002.jpg", "page-0003.jpg"])
-            self.assertEqual((output / "toc.csv").read_text(encoding="utf-8"), "position,depth,title,page_index\n1,0,Chapter,1\n2,1,Topic,2\n")
+            self.assertEqual(
+                sorted(path.name for path in output.glob("page-*.jpg")),
+                ["page-0001.jpg", "page-0002.jpg", "page-0003.jpg"],
+            )
+            self.assertEqual(
+                (output / "toc.csv").read_text(encoding="utf-8"),
+                "position,depth,title,page_index\n1,0,Chapter,1\n2,1,Topic,2\n",
+            )
 
 
 if __name__ == "__main__":

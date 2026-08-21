@@ -11,8 +11,9 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from pypdf import PdfReader
 
@@ -54,7 +55,12 @@ def locate_pdftoppm(explicit: str | None) -> str:
         Path.home()
         / ".cache/codex-runtimes/codex-primary-runtime/dependencies/native/poppler/Library/bin/pdftoppm.exe"
     )
-    for value in (explicit, os.environ.get("PDFTOPPM_PATH"), shutil.which("pdftoppm"), str(bundled)):
+    for value in (
+        explicit,
+        os.environ.get("PDFTOPPM_PATH"),
+        shutil.which("pdftoppm"),
+        str(bundled),
+    ):
         if value and Path(value).is_file():
             return str(value)
     raise FileNotFoundError("pdftoppm was not found; install Poppler or set PDFTOPPM_PATH")
@@ -78,8 +84,14 @@ def prepare(pdf_path: Path, output_dir: Path, dpi: int, quality: int, pdftoppm: 
     executable = locate_pdftoppm(pdftoppm)
     prefix = output_dir / "rendered"
     command = [
-        executable, "-jpeg", "-r", str(dpi), "-jpegopt", f"quality={quality}",
-        str(pdf_path), str(prefix),
+        executable,
+        "-jpeg",
+        "-r",
+        str(dpi),
+        "-jpegopt",
+        f"quality={quality}",
+        str(pdf_path),
+        str(prefix),
     ]
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     subprocess.run(command, check=True, creationflags=flags)
@@ -115,7 +127,13 @@ def main() -> int:
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     try:
-        pages, entries = prepare(Path(args.input).resolve(), Path(args.output).resolve(), args.dpi, args.jpeg_quality, args.pdftoppm)
+        pages, entries = prepare(
+            Path(args.input).resolve(),
+            Path(args.output).resolve(),
+            args.dpi,
+            args.jpeg_quality,
+            args.pdftoppm,
+        )
     except Exception as exc:
         logging.error("Conversion failed: %s", exc)
         return 1

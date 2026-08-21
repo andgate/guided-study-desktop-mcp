@@ -1,0 +1,1 @@
+Never run tests. Never build the project. These are long running tasks that never work for you. They only work when I do them. You must ask me to run them and I will share the output.

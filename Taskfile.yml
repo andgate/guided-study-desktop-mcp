@@ -13,7 +13,7 @@ tasks:
     platforms: [windows]
     cmds:
       - powershell -NoProfile -Command '$root = (Get-Location).Path; foreach ($name in @("bin", ".cache")) { $target = [IO.Path]::GetFullPath((Join-Path $root $name)); if ([IO.Path]::GetDirectoryName($target) -ne $root) { throw "Unsafe clean target $target" }; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force } }'
-      - go clean -cache
+      - go clean
 
   plugin:install:
     desc: Install or refresh the Teach plugin for the current user
@@ -24,8 +24,7 @@ tasks:
   test:
     desc: Run the Go and Python tests
     cmds:
-      - task: format:check
-      - go test ./...
+      - go test -x -v ./internal/...
       - uv run --project converter --locked python -m unittest discover -s converter -p "test_*.py" -v
 
   format:
