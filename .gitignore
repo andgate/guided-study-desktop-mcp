@@ -1,4 +1,5 @@
 /.ruff_cache/
+/.cache/
 /.task/
 /converter/.venv/
 /bin/
