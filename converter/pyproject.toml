@@ -1,5 +1,5 @@
 [project]
-name = "guided-study-converter"
+name = "pdf-converter"
 version = "0.1.0"
 description = "PDF conversion helper for the guided-study desktop MCP"
 requires-python = ">=3.12,<3.13"
@@ -9,6 +9,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pyinstaller==6.22.2",
     "ruff==0.16.1",
 ]
 

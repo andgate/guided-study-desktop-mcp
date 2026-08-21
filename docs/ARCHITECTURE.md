@@ -13,7 +13,7 @@ Go MCP service ----> SQLite (canonical state and rendered page BLOBs)
         |
         | bounded subprocess per import
         v
-Python + PyMuPDF ----> temporary images + toc.csv
+Bundled converter (Python + PyMuPDF) ----> temporary images + toc.csv
 ```
 
 The temporary conversion directory is removed on success and failure. Go treats every staged file as untrusted, validates names, continuity, MIME types, TOC shape/references, and size limits, then ingests the entire book in one transaction.
@@ -24,7 +24,7 @@ The temporary conversion directory is removed on success and failure. Go treats 
 - `internal/importer`: local file-reference resolution, converter subprocess execution, and staging validation.
 - `internal/store`: DDL, domain models, validation, transactions, optimistic concurrency, and all canonical data access.
 - `internal/mcpserver`: typed tool schemas, descriptions, annotations, structured results/errors, and image content.
-- `converter`: the Python PDF renderer that the local application runs directly.
+- `converter`: the PyMuPDF renderer, frozen as `pdf-converter.exe` and invoked directly by the local application.
 - `teach/skills/teach`: the teaching workflow that consumes the MCP API.
 
 ## State boundaries

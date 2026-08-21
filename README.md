@@ -9,7 +9,7 @@ The version-one contract is implemented as:
 - one Go/Fyne system-tray application;
 - a Streamable HTTP MCP endpoint at `http://127.0.0.1:7331/mcp`;
 - one canonical SQLite database under `%LOCALAPPDATA%\GuidedStudy`;
-- a Python subprocess that renders PDFs through PyMuPDF and emits temporary page images plus `toc.csv`;
+- a bundled converter executable that renders PDFs through PyMuPDF and emits temporary page images plus `toc.csv`;
 - 30 focused MCP tools covering books, reading sessions/progress, decks, and immutable card revisions;
 - the MCP-native Teach skill in [`teach/skills/teach`](teach/skills/teach/SKILL.md).
 
@@ -22,10 +22,10 @@ The source PDF is never modified, deleted, or retained in SQLite. Failed convers
 - Go 1.25 or newer for development
 - [Task](https://taskfile.dev/) v3
 - [uv](https://docs.astral.sh/uv/) 0.12.5 or newer
-- Python 3.12
+- Python 3.12 for development and builds
 - A GCC toolchain for building Fyne on Windows
 
-The application runs `converter\prepare_book.py` directly from the repository. It looks for the script next to the executable and under the current working directory; `--converter` overrides that path. Python is discovered next to the executable or on `PATH`; `--python` overrides its path.
+The build packages `converter\prepare_book.py`, Python, and PyMuPDF into `bin\pdf-converter.exe`. The application runs that executable directly and does not require a system Python installation. `--converter` overrides its path.
 
 After cloning, initialize Git LFS and materialize the application assets before building:
 
@@ -41,6 +41,8 @@ task build
 .\bin\guided-study.exe
 ```
 
+The build produces `bin\guided-study.exe` and `bin\pdf-converter.exe`. Keep them together when distributing the application.
+
 The status window may be closed without stopping the server. Reopen it from the tray. Choose **Quit** from the tray for graceful HTTP and SQLite shutdown.
 
 For terminal-only development:
@@ -54,8 +56,7 @@ Useful options:
 ```text
 --listen 127.0.0.1:7331
 --database C:\path\guided-study.db
---python C:\path\python.exe
---converter C:\path\prepare_book.py
+--converter C:\path\pdf-converter.exe
 --headless
 ```
 

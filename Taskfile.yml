@@ -2,10 +2,11 @@ version: '3'
 
 tasks:
   build:
-    desc: Build the Windows desktop application
+    desc: Build the Windows desktop application and bundled PDF converter
     platforms: [windows]
     cmds:
       - mkdir -p bin
+      - uv run --project converter --locked pyinstaller --noconfirm --clean --onefile --distpath bin --workpath .cache/pyinstaller --specpath .cache/pyinstaller --name pdf-converter converter/prepare_book.py
       - go build -v -trimpath -ldflags="-H=windowsgui -s -w" -o bin/guided-study.exe ./cmd/guided-study
 
   clean:
