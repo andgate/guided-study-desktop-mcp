@@ -66,8 +66,6 @@ func run(args []string) error {
 	// Assemble the importer, MCP service, and local HTTP transport.
 	imp := importer.New(importer.Config{
 		ConverterPath: cfg.ConverterPath,
-		DPI:           200,
-		JPEGQuality:   90,
 	})
 	mcpService := mcpserver.New(st, imp, logger)
 	httpServer := localserver.New(cfg.Listen, mcpService.Handler(logger))

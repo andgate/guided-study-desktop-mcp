@@ -10,6 +10,14 @@ import (
 	"strings"
 )
 
+const (
+	defaultListenAddress     = "127.0.0.1:7331"
+	defaultDataDirectory     = "GuidedStudy"
+	defaultDatabaseFilename  = "guided-study.db"
+	defaultConverterFilename = "pdf-converter.exe"
+	defaultHeadless          = false
+)
+
 type Config struct {
 	Listen        string
 	DatabasePath  string
@@ -60,10 +68,10 @@ func defaultConfig() (Config, error) {
 	}
 
 	return Config{
-		Listen:        "127.0.0.1:7331",
-		DatabasePath:  filepath.Join(local, "GuidedStudy", "guided-study.db"),
-		ConverterPath: filepath.Join(filepath.Dir(exe), "pdf-converter.exe"),
-		Headless:      false,
+		Listen:        defaultListenAddress,
+		DatabasePath:  filepath.Join(local, defaultDataDirectory, defaultDatabaseFilename),
+		ConverterPath: filepath.Join(filepath.Dir(exe), defaultConverterFilename),
+		Headless:      defaultHeadless,
 	}, nil
 }
 
