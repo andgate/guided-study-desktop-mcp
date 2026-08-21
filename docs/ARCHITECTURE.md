@@ -13,7 +13,7 @@ Go MCP service ----> SQLite (canonical state and rendered page BLOBs)
         |
         | bounded subprocess per import
         v
-Python + pypdf + pdftoppm ----> temporary images + toc.csv
+Python + PyMuPDF ----> temporary images + toc.csv
 ```
 
 The temporary conversion directory is removed on success and failure. Go treats every staged file as untrusted, validates names, continuity, MIME types, TOC shape/references, and size limits, then ingests the entire book in one transaction.

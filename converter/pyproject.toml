@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "PDF conversion helper for the guided-study desktop MCP"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "pypdf==6.10.0",
+    "pymupdf==1.28.2",
 ]
 
 [dependency-groups]

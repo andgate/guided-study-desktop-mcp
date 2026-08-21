@@ -67,7 +67,6 @@ func run(args []string) error {
 	imp := importer.New(importer.Config{
 		PythonPath:    cfg.PythonPath,
 		ConverterPath: cfg.ConverterPath,
-		PDFToPPMPath:  cfg.PDFToPPMPath,
 		DPI:           200,
 		JPEGQuality:   90,
 	})

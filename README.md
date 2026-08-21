@@ -9,7 +9,7 @@ The version-one contract is implemented as:
 - one Go/Fyne system-tray application;
 - a Streamable HTTP MCP endpoint at `http://127.0.0.1:7331/mcp`;
 - one canonical SQLite database under `%LOCALAPPDATA%\GuidedStudy`;
-- a Python subprocess that renders PDFs through Poppler and emits temporary page images plus `toc.csv`;
+- a Python subprocess that renders PDFs through PyMuPDF and emits temporary page images plus `toc.csv`;
 - 30 focused MCP tools covering books, reading sessions/progress, decks, and immutable card revisions;
 - the MCP-native Teach skill in [`teach/skills/teach`](teach/skills/teach/SKILL.md).
 
@@ -23,10 +23,9 @@ The source PDF is never modified, deleted, or retained in SQLite. Failed convers
 - [Task](https://taskfile.dev/) v3
 - [uv](https://docs.astral.sh/uv/) 0.12.5 or newer
 - Python 3.12
-- Poppler's `pdftoppm.exe`
 - A GCC toolchain for building Fyne on Windows
 
-The application runs `converter\prepare_book.py` directly from the repository. It looks for the script next to the executable and under the current working directory; `--converter` overrides that path. Python and Poppler are discovered next to the executable, in the Codex bundled runtime, or on `PATH`; `--python` and `--pdftoppm` override their paths.
+The application runs `converter\prepare_book.py` directly from the repository. It looks for the script next to the executable and under the current working directory; `--converter` overrides that path. Python is discovered next to the executable or on `PATH`; `--python` overrides its path.
 
 After cloning, initialize Git LFS and materialize the application assets before building:
 
@@ -57,7 +56,6 @@ Useful options:
 --database C:\path\guided-study.db
 --python C:\path\python.exe
 --converter C:\path\prepare_book.py
---pdftoppm C:\path\pdftoppm.exe
 --headless
 ```
 

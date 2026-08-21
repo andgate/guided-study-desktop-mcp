@@ -2,9 +2,8 @@ import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
-from pypdf import PdfWriter
+import pymupdf
 
 MODULE_PATH = Path(__file__).with_name("prepare_book.py")
 SPEC = importlib.util.spec_from_file_location("prepare_book", MODULE_PATH)
@@ -14,13 +13,12 @@ SPEC.loader.exec_module(converter)
 
 
 def make_pdf(path: Path):
-    writer = PdfWriter()
+    document = pymupdf.open()
     for _ in range(3):
-        writer.add_blank_page(width=100, height=100)
-    chapter = writer.add_outline_item("Chapter", 0)
-    writer.add_outline_item("Topic", 1, parent=chapter)
-    with path.open("wb") as stream:
-        writer.write(stream)
+        document.new_page(width=100, height=100)
+    document.set_toc([[1, "Chapter", 1], [2, "Topic", 2]])
+    document.save(path)
+    document.close()
 
 
 class ConverterTest(unittest.TestCase):
@@ -32,17 +30,7 @@ class ConverterTest(unittest.TestCase):
             output.mkdir()
             make_pdf(source)
 
-            def fake_run(command, check, creationflags):
-                del check, creationflags
-                prefix = Path(command[-1])
-                for page in range(1, 4):
-                    prefix.with_name(f"{prefix.name}-{page}.jpg").write_bytes(b"jpeg")
-
-            with (
-                mock.patch.object(converter, "locate_pdftoppm", return_value="pdftoppm"),
-                mock.patch.object(converter.subprocess, "run", side_effect=fake_run),
-            ):
-                pages, entries = converter.prepare(source, output, 200, 90, None)
+            pages, entries = converter.prepare(source, output, 200, 90)
 
             self.assertEqual((pages, entries), (3, 2))
             self.assertEqual(
