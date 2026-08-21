@@ -30,7 +30,12 @@ class ConverterTest(unittest.TestCase):
             output.mkdir()
             make_pdf(source)
 
-            pages, entries = converter.prepare(source, output, 200, 90)
+            pages, entries = converter.prepare(
+                source,
+                output,
+                converter.DEFAULT_DPI,
+                converter.DEFAULT_JPEG_QUALITY,
+            )
 
             self.assertEqual((pages, entries), (3, 2))
             self.assertEqual(

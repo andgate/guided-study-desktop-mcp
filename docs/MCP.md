@@ -152,10 +152,10 @@ Input:
 
 ```text
 file_reference: string
-title?: string
+title: string
 ```
 
-The server resolves the opaque reference, runs the Python converter, validates all staged pages and TOC rows, and commits the entire book in one SQLite transaction. The service generates `book_id`. If `title` is absent, the converter/source filename may supply a display title; failure to derive a nonblank title is `invalid_argument`.
+The caller supplies the book's nonblank display title. The server resolves the opaque reference, runs the PDF converter, validates all staged pages and TOC rows, and commits the entire book in one SQLite transaction. The service generates `book_id` and does not derive or replace the supplied title.
 
 Result: `BookSummary`.
 

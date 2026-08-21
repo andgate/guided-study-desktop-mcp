@@ -13,6 +13,14 @@ import pymupdf
 
 logger = logging.getLogger(__name__)
 
+MIN_DPI = 72
+MAX_DPI = 600
+DEFAULT_DPI = 200
+
+MIN_JPEG_QUALITY = 1
+MAX_JPEG_QUALITY = 100
+DEFAULT_JPEG_QUALITY = 90
+
 
 def outline_title(title: object) -> str:
     return str(title or "Untitled").strip() or "Untitled"
@@ -23,10 +31,10 @@ def prepare(pdf_path: Path, output_dir: Path, dpi: int, quality: int):
         raise ValueError(f"Source is not a readable PDF: {pdf_path}")
     if not output_dir.is_dir() or any(output_dir.iterdir()):
         raise ValueError("Output directory must exist and be empty")
-    if not 72 <= dpi <= 600:
-        raise ValueError("DPI must be between 72 and 600")
-    if not 1 <= quality <= 100:
-        raise ValueError("JPEG quality must be between 1 and 100")
+    if not MIN_DPI <= dpi <= MAX_DPI:
+        raise ValueError(f"DPI must be between {MIN_DPI} and {MAX_DPI}")
+    if not MIN_JPEG_QUALITY <= quality <= MAX_JPEG_QUALITY:
+        raise ValueError(f"JPEG quality must be between {MIN_JPEG_QUALITY} and {MAX_JPEG_QUALITY}")
 
     with pymupdf.open(pdf_path) as document:
         page_count = document.page_count
@@ -58,8 +66,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--dpi", type=int, default=200)
-    parser.add_argument("--jpeg-quality", type=int, default=90)
+    parser.add_argument("--dpi", type=int, default=DEFAULT_DPI)
+    parser.add_argument("--jpeg-quality", type=int, default=DEFAULT_JPEG_QUALITY)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     try:
