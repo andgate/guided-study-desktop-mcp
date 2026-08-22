@@ -40,7 +40,12 @@ func Parse(args []string) (Config, error) {
 	set.StringVar(&cfg.Listen, "listen", cfg.Listen, "HTTP listen address")
 	set.StringVar(&cfg.DatabasePath, "database", cfg.DatabasePath, "SQLite database path")
 	set.StringVar(&cfg.ConverterPath, "converter", cfg.ConverterPath, "PDF converter executable")
-	set.BoolVar(&cfg.Headless, "headless", cfg.Headless, "run the MCP service without the desktop tray")
+	set.BoolVar(
+		&cfg.Headless,
+		"headless",
+		cfg.Headless,
+		"run the MCP service without the desktop tray",
+	)
 
 	if err := set.Parse(args); err != nil {
 		return Config{}, err

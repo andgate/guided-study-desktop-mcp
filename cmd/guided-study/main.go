@@ -111,7 +111,13 @@ func waitHeadless(ctx context.Context, server *http.Server, serverErrors <-chan 
 }
 
 // runDesktop owns the Fyne event loop and coordinates it with the HTTP server.
-func runDesktop(ctx context.Context, cancel context.CancelFunc, cfg appconfig.Config, server *http.Server, serverErrors <-chan error) (resultErr error) {
+func runDesktop(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	cfg appconfig.Config,
+	server *http.Server,
+	serverErrors <-chan error,
+) (resultErr error) {
 	// Once desktop startup begins, every return path owns graceful server cleanup.
 	defer func() {
 		resultErr = errors.Join(resultErr, shutdownServer(server))
@@ -181,7 +187,9 @@ func newStatusWindow(a fyne.App, cfg appconfig.Config) (fyne.Window, *widget.Lab
 		status,
 		connectionForm,
 		copyButton,
-		widget.NewLabel("Closing this window keeps the service running. Use Quit from the tray to stop it."),
+		widget.NewLabel(
+			"Closing this window keeps the service running. Use Quit from the tray to stop it.",
+		),
 	)
 
 	window.SetContent(content)
