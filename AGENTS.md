@@ -4,4 +4,4 @@ Code should be readable, with comments and newlines to logically group the code.
 
 Avoid magic constants. Literals, such as defaults, should be a constant at the top of the file Follow the idiomatic go naming
 
-Do not modify docs/PLAN_0.md. It is retained as a historical artifact and must remain byte-for-byte identical to the version first committed to the repository.
+Do not modify docs/PLAN_0.md. It is retained as a historical artifact.
