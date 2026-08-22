@@ -25,8 +25,7 @@ type Config struct {
 	Headless      bool
 }
 
-// Parse builds a configuration from platform-specific defaults and command-line
-// overrides. The resulting configuration is validated before it is returned.
+// Parse reads command-line configuration and applies defaults.
 func Parse(args []string) (Config, error) {
 	cfg, err := defaultConfig()
 	if err != nil {
@@ -35,8 +34,7 @@ func Parse(args []string) (Config, error) {
 
 	set := flag.NewFlagSet("guided-study", flag.ContinueOnError)
 
-	// Every flag writes directly into cfg, overriding its default value when the
-	// caller supplies the corresponding flag.
+	// Flags override the default values in cfg.
 	set.StringVar(&cfg.Listen, "listen", cfg.Listen, "HTTP listen address")
 	set.StringVar(&cfg.DatabasePath, "database", cfg.DatabasePath, "SQLite database path")
 	set.StringVar(&cfg.ConverterPath, "converter", cfg.ConverterPath, "PDF converter executable")
@@ -59,14 +57,13 @@ func Parse(args []string) (Config, error) {
 }
 
 func defaultConfig() (Config, error) {
-	// Application data belongs under the current Windows user's local app-data
-	// directory. Without it, there is no safe default database location.
+	// Store application data in the current user's local app-data directory.
 	local := os.Getenv("LOCALAPPDATA")
 	if local == "" {
 		return Config{}, errors.New("LOCALAPPDATA is not set")
 	}
 
-	// The frozen PDF converter is distributed beside the desktop executable.
+	// Find the PDF converter beside the desktop executable.
 	exe, err := os.Executable()
 	if err != nil {
 		return Config{}, err
@@ -80,7 +77,7 @@ func defaultConfig() (Config, error) {
 	}, nil
 }
 
-// Validate rejects malformed configuration and unusable required paths.
+// Validate checks required values and paths.
 func (c Config) Validate() error {
 	_, _, err := net.SplitHostPort(c.Listen)
 	if err != nil {

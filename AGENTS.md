@@ -4,4 +4,12 @@ Code should be readable, with comments and newlines to logically group the code.
 
 Avoid magic constants. Literals, such as defaults, should be a constant at the top of the file Follow the idiomatic go naming
 
+Comment blocks are <= 7 words, function names <= 4 words. User-facing message strings should be <= 10 words. Use an active voice, no stage performances, and pick the most common word when choosing among alternatives.
+
+Do not writes comments about how things used to work when refactoring.
+
+When updating a document, do not ever write about how things used to work. Do not refer to the previous version of the document, either.
+
+When updated a code comment, do not ever mention the old code or that the code was changed.
+
 Do not modify docs/PLAN_0.md. It is retained as a historical artifact.
