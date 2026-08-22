@@ -30,7 +30,7 @@ var trayIconBytes []byte
 
 var trayIconResource = fyne.NewStaticResource("guided-study-tray.png", trayIconBytes)
 
-// main translates a startup failure into a logged message and a nonzero exit status.
+// main logs startup failures.
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		slog.Error("guided-study stopped", "error", err)
@@ -38,32 +38,32 @@ func main() {
 	}
 }
 
-// run assembles the application and owns its process-level lifecycle.
+// run starts the application.
 func run(args []string) error {
-	// Load and validate settings before creating any application resources.
+	// Load the application settings.
 	cfg, err := appconfig.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	// Prepare the data directory before opening the canonical SQLite store.
+	// Create the database directory.
 	if err := os.MkdirAll(filepath.Dir(cfg.DatabasePath), 0o700); err != nil {
 		return fmt.Errorf("create data directory: %w", err)
 	}
 
-	// Tie application lifetime to Ctrl+C and ordinary process termination.
+	// Stop when the process receives a signal.
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// Open durable state before constructing services that depend on it.
+	// Open the database.
 	st, err := store.Open(ctx, cfg.DatabasePath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
 	defer st.Close()
 
-	// Assemble the importer, MCP service, and local HTTP transport.
+	// Create the services and HTTP server.
 	imp := importer.New(importer.Config{
 		ConverterPath: cfg.ConverterPath,
 	})
@@ -71,15 +71,14 @@ func run(args []string) error {
 	httpServer := localserver.New(cfg.Listen, mcpService.Handler(logger))
 	serverErrors := startHTTPServer(httpServer, logger, cfg.DatabasePath)
 
-	// Hand lifecycle control to either the terminal or desktop interface.
+	// Start the selected interface.
 	if cfg.Headless {
 		return waitHeadless(ctx, httpServer, serverErrors)
 	}
 	return runDesktop(ctx, cancel, cfg, httpServer, serverErrors)
 }
 
-// startHTTPServer reports unexpected listener failures. A normal shutdown
-// closes the returned channel without sending an error.
+// startHTTPServer runs the HTTP listener.
 func startHTTPServer(server *http.Server, logger *slog.Logger, databasePath string) <-chan error {
 	serverErrors := make(chan error, 1)
 
@@ -100,7 +99,7 @@ func startHTTPServer(server *http.Server, logger *slog.Logger, databasePath stri
 	return serverErrors
 }
 
-// waitHeadless blocks until the listener fails or the process receives a stop signal.
+// waitHeadless waits for shutdown or failure.
 func waitHeadless(ctx context.Context, server *http.Server, serverErrors <-chan error) error {
 	select {
 	case err := <-serverErrors:
@@ -110,7 +109,7 @@ func waitHeadless(ctx context.Context, server *http.Server, serverErrors <-chan 
 	}
 }
 
-// runDesktop owns the Fyne event loop and coordinates it with the HTTP server.
+// runDesktop runs the desktop interface.
 func runDesktop(
 	ctx context.Context,
 	cancel context.CancelFunc,
@@ -118,17 +117,17 @@ func runDesktop(
 	server *http.Server,
 	serverErrors <-chan error,
 ) (resultErr error) {
-	// Once desktop startup begins, every return path owns graceful server cleanup.
+	// Stop the HTTP server before returning.
 	defer func() {
 		resultErr = errors.Join(resultErr, shutdownServer(server))
 	}()
 
-	// Construct the visible status window before exposing tray actions.
+	// Create the status window.
 	a := app.NewWithID("com.andgate.guided-study")
 	a.SetIcon(trayIconResource)
 	window, status, endpoint := newStatusWindow(a, cfg)
 
-	// Give the tray's Quit action one path for cancellation and graceful shutdown.
+	// Stop the application from the tray.
 	quit := func() {
 		status.SetText("Stopping")
 		cancel()
@@ -138,13 +137,13 @@ func runDesktop(
 		return err
 	}
 
-	// Watch the server while Fyne owns the current thread.
+	// Watch the server for failures.
 	desktopResult := monitorDesktop(ctx, a, window, status, serverErrors)
 
 	window.Show()
 	a.Run()
 
-	// Complete process cleanup after the UI event loop exits.
+	// Cancel remaining background work.
 	cancel()
 
 	select {
@@ -157,12 +156,12 @@ func runDesktop(
 	return nil
 }
 
-// newStatusWindow builds the read-only service status interface.
+// newStatusWindow creates the status window.
 func newStatusWindow(a fyne.App, cfg appconfig.Config) (fyne.Window, *widget.Label, string) {
 	window := a.NewWindow("Guided Study")
 	endpoint := "http://" + cfg.Listen + "/mcp"
 
-	// Build the status and connection fields displayed to the user.
+	// Create the status fields.
 	status := widget.NewLabel("Running")
 	status.TextStyle = fyne.TextStyle{Bold: true}
 
@@ -174,7 +173,7 @@ func newStatusWindow(a fyne.App, cfg appconfig.Config) (fyne.Window, *widget.Lab
 	databaseEntry.SetText(cfg.DatabasePath)
 	databaseEntry.Disable()
 
-	// Compose the controls into the final vertical window layout.
+	// Build the window layout.
 	copyButton := widget.NewButton("Copy endpoint", func() {
 		a.Clipboard().SetContent(endpoint)
 	})
@@ -199,7 +198,7 @@ func newStatusWindow(a fyne.App, cfg appconfig.Config) (fyne.Window, *widget.Lab
 	return window, status, endpoint
 }
 
-// configureSystemTray connects the persistent background service to desktop actions.
+// configureSystemTray creates the tray menu.
 func configureSystemTray(a fyne.App, window fyne.Window, endpoint string, quit func()) error {
 	desktopApp, ok := a.(desktop.App)
 	if !ok {
@@ -221,8 +220,7 @@ func configureSystemTray(a fyne.App, window fyne.Window, endpoint string, quit f
 	return nil
 }
 
-// monitorDesktop coordinates process cancellation and HTTP listener failures
-// with Fyne's UI thread, then reports the reason the desktop loop stopped.
+// monitorDesktop watches for shutdown and errors.
 func monitorDesktop(
 	ctx context.Context,
 	a fyne.App,
@@ -255,7 +253,7 @@ func monitorDesktop(
 	return result
 }
 
-// shutdownServer gives active HTTP requests a bounded period to finish.
+// shutdownServer waits for active requests.
 func shutdownServer(server *http.Server) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

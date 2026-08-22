@@ -12,4 +12,6 @@ When updating a document, do not ever write about how things used to work. Do no
 
 When updated a code comment, do not ever mention the old code or that the code was changed.
 
+Comments should answer "why is this code here?" in the simplest useful language.
+
 Do not modify docs/PLAN_0.md. It is retained as a historical artifact.
