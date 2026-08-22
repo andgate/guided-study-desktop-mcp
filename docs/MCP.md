@@ -6,7 +6,7 @@ This document is the draft version-one MCP contract for `guided-study-desktop-mc
 
 The local Windows application exposes one Streamable HTTP MCP endpoint, initially `/mcp`, from the same Go process that owns the tray application and SQLite connection. ChatGPT connects to the configured address and port. STDIO and non-ChatGPT hosts are outside the version-one contract.
 
-The uploaded-PDF handoff remains an integration spike. `import_book.file_reference` is therefore deliberately an opaque string until ChatGPT's actual upload-to-MCP behavior is verified.
+The host supplies `import_book.file_reference` as an absolute path to the local PDF.
 
 ## Result and error conventions
 
@@ -46,8 +46,7 @@ Stable version-one error codes are:
 | `log_tail_conflict` | `expected_last_log_id` does not equal the current log tail. |
 | `deck_revision_conflict` | `expected_revision` does not equal the deck metadata revision. |
 | `card_revision_conflict` | `expected_revision` does not equal the logical card's latest revision. |
-| `file_reference_unsupported` | The ChatGPT-supplied reference cannot be resolved by the local service. |
-| `conversion_failed` | The Python converter returned failure or invalid staging output. |
+| `conversion_failed` | The converter could not run, returned failure, or produced invalid staging output. |
 | `storage_error` | SQLite or local storage failed unexpectedly. |
 
 Conflict errors include expected and actual values. `log_tail_conflict` additionally includes up to the latest 10 entries in ascending order so an agent can recognize and repair state created by a discarded conversation branch.
@@ -155,7 +154,7 @@ file_reference: string
 title: string
 ```
 
-The caller supplies the book's nonblank display title. The server resolves the opaque reference, runs the PDF converter, validates all staged pages and TOC rows, and commits the entire book in one SQLite transaction. The service generates `book_id` and does not derive or replace the supplied title.
+The caller supplies the book's absolute local path and nonblank display title. The server passes the path to the PDF converter, validates all staged pages and TOC rows, and commits the entire book in one SQLite transaction. The service generates `book_id` and does not derive or replace the supplied title.
 
 Result: `BookSummary`.
 
@@ -566,13 +565,3 @@ Result: `{ deleted_card_ids: string[] }`, sorted by `card_id`. Destructive.
 The MCP surface has no global selected book, implicit active session, `complete_page`, extracted-text reader, split-PDF reader, agent identity or connection tracking, cross-deck move, card reorder, batch card update, whole-deck replacement, soft delete, restore, publication/archive workflow, review scheduling, or export tool. Deterministic export can be added after canonical editing is proven.
 
 The service also does not silently accept unrecognized input fields. Rejecting them helps prevent clients from accidentally introducing prohibited card metadata.
-
-## Integration questions intentionally left open
-
-Only the ChatGPT upload bridge remains unresolved by this contract:
-
-1. what exact `file_reference` value ChatGPT can send to a custom MCP tool;
-2. whether a local server can dereference it directly;
-3. whether an auxiliary upload endpoint is required.
-
-Those questions must be answered by the Phase 1 ChatGPT integration spike. They do not change the SQLite, reading, progress, or flashcard contracts above.

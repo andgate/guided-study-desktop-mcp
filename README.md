@@ -86,7 +86,7 @@ http://127.0.0.1:7331/mcp
 
 The health probe is `GET /healthz`.
 
-The `import_book.file_reference` bridge deliberately supports local filesystem paths and `file://` URLs first. Other opaque ChatGPT upload references return `file_reference_unsupported` until actual host behavior is verified. This is the one integration question intentionally left open by the contract.
+The `import_book.file_reference` input is the absolute path to the local PDF supplied by the host.
 
 ## Install Teach locally
 
