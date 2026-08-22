@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/andgate/guided-study-desktop-mcp/internal/store"
 )
@@ -100,7 +101,7 @@ func (i *Importer) Prepare(
 
 	// Stop canceled conversions.
 	cmd := exec.CommandContext(ctx, i.config.ConverterPath, args...)
-	hideSubprocessWindow(cmd)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 
 	// Capture converter errors.
 	diagnostics, err := cmd.CombinedOutput()
