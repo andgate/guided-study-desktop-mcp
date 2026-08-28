@@ -11,13 +11,13 @@ The host supplies `import_book.file_reference` as an absolute path to the local 
 ## Result and error conventions
 
 - Ordinary successful tools return JSON in `structuredContent` and a short text fallback in `content`.
-- Page-reading tools return structured page metadata plus one MCP image content block containing the rendered page's MIME type and base64 data. The image bytes are not duplicated inside `structuredContent`.
+- Page-reading tools return structured metadata plus rendered MCP image blocks. Image bytes are not duplicated inside `structuredContent`.
 - Inputs and structured results receive JSON Schemas in the server registration.
 - Missing optional fields mean “not supplied.” JSON `null` is used only where this contract explicitly permits it.
 - Mutations are atomic. A validation or conflict error leaves state unchanged.
 - Destructive tools are registered with MCP's destructive annotation. Read-only tools are marked read-only.
 - Times are UTC RFC 3339 strings.
-- Page indices are 1-based physical PDF page indices.
+- Page indices are 1-based and assigned during import.
 
 An unsuccessful tool call sets MCP `isError` and returns this structured error shape with a matching short text message:
 
@@ -41,7 +41,7 @@ Stable version-one error codes are:
 | `invalid_argument` | An input is missing, malformed, blank, or internally inconsistent. |
 | `not_found` | The exact book, session, deck, card, revision, or page does not exist. |
 | `already_exists` | A caller-supplied deck ID or case-insensitive session name is already in use within its book. |
-| `out_of_bounds` | Navigation requested a page below 1 or above the book's page count. |
+| `out_of_bounds` | A requested page falls below 1 or above the book's page count. |
 | `cursor_conflict` | `expected_page_index` does not equal the effective stored cursor. |
 | `log_tail_conflict` | `expected_last_log_id` does not equal the current log tail. |
 | `deck_revision_conflict` | `expected_revision` does not equal the deck metadata revision. |
@@ -82,6 +82,19 @@ PageMetadata {
   page_count: integer
   current_section: string | null
   toc_context: TocEntry[]
+}
+
+PageBatchEntry {
+  page_index: integer
+  toc_context: TocEntry[]
+}
+
+PageBatch {
+  book_id: string
+  page_count: integer
+  start_page_index: integer
+  end_page_index: integer
+  pages: PageBatchEntry[]
 }
 
 ProgressLogEntry {
@@ -203,13 +216,35 @@ Result:
 
 This immediately hard-deletes the exact book and all canonical study data owned by it. It never touches the source PDF. Destructive.
 
+## Page batch tools
+
+### `read_pages`
+
+Input:
+
+```text
+book_id: string
+start_page_index: integer
+end_page_index: integer
+```
+
+The range is inclusive and may have any valid size. The start must not exceed
+the end, and both indices must fall within the book.
+
+Result: `PageBatch` in `structuredContent`. Each page entry has matching TOC
+context. The MCP content contains `Page N.` before each rendered image, with
+entries, labels, and images in ascending order.
+
+This tool is read-only. It does not require or access a study session, and it
+does not move any session cursor.
+
 ## Progressive reading tools
 
 A study session is a durable, named reading thread for exactly one book. It is not tied to the MCP connection or to one ChatGPT conversation. Any later agent can resume it by supplying its stable `session_id`.
 
 There is no implicit or globally active session. After choosing a book, a new chat calls `list_sessions`, resumes an obvious session, asks the user when the choice is ambiguous, or creates a new one. Every reading and progress tool requires an existing session belonging to the supplied book.
 
-Page-returning tools produce `PageMetadata` in `structuredContent` and the rendered page as an MCP image content block.
+Session page tools produce `PageMetadata` in `structuredContent` and one rendered MCP image block.
 
 ### `create_session`
 

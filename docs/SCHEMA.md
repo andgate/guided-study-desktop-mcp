@@ -10,7 +10,7 @@ SQLite is the canonical store. The source PDF and converter output are temporary
 
 - The application enables `PRAGMA foreign_keys = ON` for every database connection.
 - All writes that affect more than one row are performed in a transaction.
-- `page_index` is always the **1-based physical PDF page index**. Page 1 is the first physical page in the source PDF, regardless of a printed page label.
+- `page_index` is always a **1-based index assigned during import**. Page 1 is the first rendered page, regardless of a printed page label.
 - `book_id`, `session_id`, and `card_id` are service-generated UUIDs in canonical lowercase text form.
 - `deck_id` is supplied by the caller and must match `[a-z0-9][a-z0-9_-]{0,63}`. It is unique within a book.
 - IDs are stable and are never derived from editable titles.
@@ -182,7 +182,7 @@ Current cards are obtained through `current_cards`. Listing and export sort by `
 
 The converter receives an input PDF path or readable reference resolved by Go and a newly created temporary output directory. On success it writes:
 
-- one image per physical page, named `page-0001.<ext>`, `page-0002.<ext>`, and so on without gaps;
+- one image per page, named `page-0001.<ext>`, `page-0002.<ext>`, and so on without gaps;
 - `toc.csv` with the exact header `position,depth,title,page_index`.
 
 The converter exits nonzero on failure and writes diagnostics to standard error. It must not write canonical SQLite state, retain the source PDF, or emit split PDFs.
