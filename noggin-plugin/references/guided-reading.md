@@ -34,6 +34,7 @@ Before every study question, report the current section and page. If the
 question spans a page boundary, report both pages. Do not tell the learner what
 to read or where the answer is located within the named pages.
 
+Ask sequential questions that build thorough coverage of the page.
 A dense page usually needs more questions than a light page. Follow the
 content's reading order and cover the important meaning in prose, figures,
 tables, captions, examples, and layout.
