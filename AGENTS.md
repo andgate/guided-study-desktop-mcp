@@ -14,4 +14,4 @@ When updated a code comment, do not ever mention the old code or that the code w
 
 Comments should answer "why is this code here?" in the simplest useful language.
 
-Do not modify docs/PLAN_0.md. It is retained as a historical artifact.
+Do not modify anything under `docs/plan/` unless you have been given explicit instructions to do so. These files are frozen and immutable records.
