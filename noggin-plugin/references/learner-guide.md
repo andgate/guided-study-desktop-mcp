@@ -17,18 +17,18 @@ parts of that structure after the material makes sense.
 ## Start or resume
 
 Name the book, chapter, or section you want to study. The agent can create a
-named study session or resume an existing one. A session remembers the book,
-current page, and current section across chats.
+named study session or resume an existing one. A session remembers the book and
+current section across chats.
 
-When a new chat resumes partway through a page, the agent restarts that page.
-This keeps the page's questions and explanations coherent without
+When a new chat resumes partway through a section, the agent restarts that
+section. This keeps the section's questions and explanations coherent without
 reconstructing an unfinished exchange from an earlier chat.
 
 ## Why questions come first
 
-One purposeful question arrives before you read. The question provides a target
-for attention, so reading becomes a search for an idea, relationship,
-mechanism, distinction, or consequence.
+After the section has been loaded, one purposeful question begins the study
+loop. The question provides a target for attention, so discussion becomes a
+search for an idea, relationship, mechanism, distinction, or consequence.
 
 The experience is an intellectual Easter egg hunt: you know what you are
 currently looking for. The question guides attention while the book remains
@@ -36,15 +36,16 @@ the authority for the answer.
 
 ## What guided reading feels like
 
-The agent reports the current section and page before every study question. It
-asks one question at a time and moves linearly through the material.
+The agent reports the current section before every study question. It asks one
+question at a time and moves linearly through the sections.
 
-A light page may need one question. A dense page may require several sequential
-questions. The agent advances after the important material on the page has been
-sufficiently covered.
+A short section may need one question. A dense section may require several
+sequential questions. The agent advances after the important material in the
+section has been sufficiently covered.
 
-This pace keeps the reading focused while allowing ideas, figures, tables, and
-examples to receive the attention they require.
+Pages are loaded in consecutive batches of up to five before the question loop
+begins. This keeps the section available while ideas, figures, tables, and
+examples receive the attention they require.
 
 ## Discuss answers
 
@@ -66,8 +67,8 @@ switch books, change workflows, or stop. Your direction controls the study
 session.
 
 Prepared books provide ordered sections and rendered page images. The service
-stores the current location, while the agent interprets the material, chooses
-questions, evaluates answers, and decides when the page has been covered.
+stores the current section, while the agent interprets the material, chooses
+questions, evaluates answers, and decides when the section has been covered.
 
 ## Create flashcards
 

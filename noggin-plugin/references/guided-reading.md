@@ -3,7 +3,7 @@
 ## Purpose
 
 Make reading active and develop understanding. Give the learner one concrete
-target before they read. The learner reads to discover an important idea,
+target for the loaded section. The learner reads to discover an important idea,
 relationship, explanation, mechanism, distinction, or consequence.
 
 The experience should feel like an intellectual Easter egg hunt: the learner
@@ -17,33 +17,36 @@ than formal assessment.
 3. Call `list_sessions` for that book.
 4. Resume an obvious session, ask when several sessions plausibly match, or
    call `create_session` with a meaningful name.
-5. Call `current_page`.
-6. Restart the current page when a new chat resumes a session.
-7. Begin the question loop on the current page.
+5. TODO: Call the finalized section-state tool to identify the current TOC
+   section and its page range.
+6. Restart the current section when a new chat resumes a session.
+7. TODO: Call the finalized section-reading tool to load the current section in
+   consecutive batches of up to five pages.
+8. Begin the question loop after the complete section is loaded.
 
 A study session is a durable reading thread. A new chat can resume the same
 session.
 
 ## Guide the reading
 
-Move linearly through the book and through the content on each page. Use one
-page by default. Keep a few consecutive pages in view when an idea crosses a
-page boundary.
+Move linearly through the book's TOC sections. Treat one complete section as
+the reading unit. Load its pages in consecutive batches of up to five pages
+before asking questions about the section.
 
-Before every study question, report the current section and page. If the
-question spans a page boundary, report both pages. Do not tell the learner what
-to read or where the answer is located within the named pages.
+Before every question, report the current section and the source page or pages
+for that question. Report both pages when a question spans a page boundary. Do
+not tell the learner what to read or where the answer is located within the
+section.
 
-Ask sequential questions that build thorough coverage of the page.
-A dense page usually needs more questions than a light page. Follow the
-content's reading order and cover the important meaning in prose, figures,
+Ask sequential questions that build thorough coverage of the section. Follow
+the content's reading order and cover the important meaning in prose, figures,
 tables, captions, examples, and layout.
 
 Ask one question at a time. Wait for the learner's response and report your
 evaluation of their answer. Do not ask another question until the learner has
 answered the current question fully. After a full answer, ask another question
-if the current page has more important material. Advance after the page is
-sufficiently covered.
+if the current section has more important material. After the current section
+is sufficiently covered, load the next TOC section and begin its question loop.
 
 Ask reading comprehension questions that expect a written response. Questions
 should prove the learner's basic comprehension and understanding of the named
@@ -64,9 +67,6 @@ Explain the concept when the learner is confused. Learners may revise an
 answer, ask for a hint, request a direct explanation, or incorporate the
 explanation into a stronger answer. Understanding gained through discussion is
 valid understanding.
-
-After the learner answers fully, ask another question if the page has more
-material. Advance after the page is sufficiently covered.
 
 When the learner asks a question, answer it fully. Then resume the unanswered
 study question unless the learner directs otherwise. Assume the learner wants

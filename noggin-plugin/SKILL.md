@@ -1,6 +1,6 @@
 ---
 name: noggin
-description: Guide active, page-by-page learning from prepared books. Use for starting or resuming guided reading; studying or discussing a chapter, section, page, figure, or table; building understanding through one question at a time; explaining the study method; or creating and revising flashcard decks from a prepared book.
+description: Guide active, section-by-section learning from prepared books. Use for starting or resuming guided reading; studying or discussing a chapter, section, page, figure, or table; building understanding through one question at a time; explaining the study method; or creating and revising flashcard decks from a prepared book.
 ---
 
 # Guided study
