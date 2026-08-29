@@ -7,7 +7,7 @@ import yaml
 
 SKILL_NAME = "noggin"
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_SKILL = REPO_ROOT / "teach-plugin"
+SOURCE_SKILL = REPO_ROOT / "noggin-plugin"
 USER_SKILLS = Path.home() / ".agents" / "skills"
 DESTINATION = USER_SKILLS / SKILL_NAME
 

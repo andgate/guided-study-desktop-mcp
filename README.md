@@ -11,7 +11,7 @@ The version-one contract is implemented as:
 - one canonical SQLite database under `%LOCALAPPDATA%\GuidedStudy`;
 - a bundled converter executable that renders PDFs through PyMuPDF and emits temporary page images plus `toc.csv`;
 - 27 focused MCP tools covering books, reading sessions, decks, and immutable card revisions;
-- the MCP-native Noggin skill in [`teach-plugin`](teach-plugin/SKILL.md).
+- the MCP-native Noggin skill in [`noggin-plugin`](noggin-plugin/SKILL.md).
 
 The source PDF is never modified, deleted, or retained in SQLite. Failed conversion or validation cannot expose a partial book.
 
@@ -96,7 +96,7 @@ Connecting the MCP server exposes storage and navigation tools, but it does not 
 task plugin:install
 ```
 
-The task runs `python scripts/install_plugin.py` in the global Python environment. It validates the skill from `teach-plugin` and installs it at `%USERPROFILE%\.agents\skills\noggin`, making it available outside this repository. The installer does not require the Codex CLI.
+The task runs `python scripts/install_plugin.py` in the global Python environment. It validates the skill from `noggin-plugin` and installs it at `%USERPROFILE%\.agents\skills\noggin`, making it available outside this repository. The installer does not require the Codex CLI.
 
 Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable HTTP server named `guided_study` with URL `http://127.0.0.1:7331/mcp`. Start a new conversation after installing or refreshing the plugin so the client discovers the updated skill.
 

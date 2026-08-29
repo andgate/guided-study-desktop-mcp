@@ -25,7 +25,7 @@ The temporary conversion directory is removed on success and failure. Go treats 
 - `internal/store`: DDL, domain models, validation, transactions, optimistic concurrency, and all canonical data access.
 - `internal/mcpserver`: typed tool schemas, descriptions, annotations, structured results/errors, and image content.
 - `converter`: the PyMuPDF renderer, frozen as `pdf-converter.exe` and invoked directly by the local application.
-- `teach-plugin`: the Noggin workflow that consumes the MCP API.
+- `noggin-plugin`: the Noggin workflow that consumes the MCP API.
 
 ## State boundaries
 
