@@ -16,7 +16,6 @@ The host supplies `import_book.file_reference` as an absolute path to the local 
 - Missing optional fields mean “not supplied.” JSON `null` is used only where this contract explicitly permits it.
 - Mutations are atomic. A validation or conflict error leaves state unchanged.
 - Destructive tools are registered with MCP's destructive annotation. Read-only tools are marked read-only.
-- Times are UTC RFC 3339 strings.
 - Page indices are 1-based and assigned during import.
 
 An unsuccessful tool call sets MCP `isError` and returns this structured error shape with a matching short text message:
@@ -43,13 +42,12 @@ Stable version-one error codes are:
 | `already_exists` | A caller-supplied deck ID or case-insensitive session name is already in use within its book. |
 | `out_of_bounds` | A requested page falls below 1 or above the book's page count. |
 | `cursor_conflict` | `expected_page_index` does not equal the effective stored cursor. |
-| `log_tail_conflict` | `expected_last_log_id` does not equal the current log tail. |
 | `deck_revision_conflict` | `expected_revision` does not equal the deck metadata revision. |
 | `card_revision_conflict` | `expected_revision` does not equal the logical card's latest revision. |
 | `conversion_failed` | The converter could not run, returned failure, or produced invalid staging output. |
 | `storage_error` | SQLite or local storage failed unexpectedly. |
 
-Conflict errors include expected and actual values. `log_tail_conflict` additionally includes up to the latest 10 entries in ascending order so an agent can recognize and repair state created by a discarded conversation branch.
+Conflict errors include expected and actual values.
 
 ## Shared result types
 
@@ -97,31 +95,12 @@ PageBatch {
   pages: PageBatchEntry[]
 }
 
-ProgressLogEntry {
-  log_id: integer
-  page_index: integer
-  section: string | null
-  message: string
-  logged_at: string
-}
-
 SessionSummary {
   book_id: string
   session_id: string
   name: string
   page_index: integer
   current_section: string | null
-  last_log: ProgressLogEntry | null
-}
-
-Progress {
-  book_id: string
-  session_id: string
-  session_name: string
-  page_index: integer
-  current_section: string | null
-  last_log_id: integer | null
-  recent_logs: ProgressLogEntry[]
 }
 
 DeckSummary {
@@ -242,7 +221,7 @@ does not move any session cursor.
 
 A study session is a durable, named reading thread for exactly one book. It is not tied to the MCP connection or to one ChatGPT conversation. Any later agent can resume it by supplying its stable `session_id`.
 
-There is no implicit or globally active session. After choosing a book, a new chat calls `list_sessions`, resumes an obvious session, asks the user when the choice is ambiguous, or creates a new one. Every reading and progress tool requires an existing session belonging to the supplied book.
+There is no implicit or globally active session. After choosing a book, a new chat calls `list_sessions`, resumes an obvious session, asks the user when the choice is ambiguous, or creates a new one. Every session reading tool requires an existing session belonging to the supplied book.
 
 Session page tools produce `PageMetadata` in `structuredContent` and one rendered MCP image block.
 
@@ -255,7 +234,7 @@ book_id: string
 name: string
 ```
 
-The server trims the name, requires it to be unique within the book under case-insensitive comparison, generates `session_id`, and initializes the cursor to page 1 with no current section or log entries.
+The server trims the name, requires it to be unique within the book under case-insensitive comparison, generates `session_id`, and initializes the cursor to page 1 with no current section.
 
 Result: `SessionSummary`.
 
@@ -263,7 +242,7 @@ Result: `SessionSummary`.
 
 Input: `book_id: string`.
 
-Result: `{ sessions: SessionSummary[] }`, sorted case-insensitively by name and then by `session_id`. `last_log` contains the complete latest entry or `null`, giving the agent enough context to recognize a session. Read-only.
+Result: `{ sessions: SessionSummary[] }`, sorted case-insensitively by name and then by `session_id`. Read-only.
 
 ### `rename_session`
 
@@ -275,7 +254,7 @@ session_id: string
 new_name: string
 ```
 
-The new name must remain unique within the book. The stable ID, cursor, section, and log are unchanged.
+The new name must remain unique within the book. The stable ID, cursor, and section are unchanged.
 
 Result: updated `SessionSummary`.
 
@@ -288,7 +267,7 @@ book_id: string
 session_id: string
 ```
 
-This immediately hard-deletes the exact session, its cursor, and its progress log. It does not delete the book, decks, or cards.
+This immediately hard-deletes the exact session and its cursor. It does not delete the book, decks, or cards.
 
 Result: `{ book_id: string, session_id: string, deleted: true }`. Destructive.
 
@@ -332,17 +311,6 @@ expected_page_index: integer
 
 The server checks the current cursor and target bounds, then stores the target and returns its image plus `PageMetadata`. Going to the already-current page succeeds without creating a second kind of cursor revision.
 
-### `get_progress`
-
-Input:
-
-```text
-book_id: string
-session_id: string
-```
-
-Result: `Progress`. `recent_logs` contains up to the latest 10 entries in ascending order. This tool does not generate a narrative study summary, pending question, concepts-learned state, cursor revision, or update timestamp. Read-only.
-
 ### `set_current_section`
 
 Input:
@@ -355,65 +323,7 @@ section: string | null
 
 The text is supplied by the agent and is not inferred or validated against the TOC. `null` clears it. Repeating the same value is idempotent.
 
-Result: `Progress`.
-
-### `log_progress`
-
-Input:
-
-```text
-book_id: string
-session_id: string
-expected_last_log_id: integer | null
-log_message: string
-```
-
-The expected ID is required and must be `null` for an empty stream. On success the server snapshots the current page and section, attaches its UTC timestamp, and appends one entry.
-
-Result:
-
-```text
-{
-  entry: ProgressLogEntry
-  last_log_id: integer
-}
-```
-
-### `amend_last_log`
-
-Input:
-
-```text
-book_id: string
-session_id: string
-expected_last_log_id: integer
-replacement_message: string
-```
-
-Only the actual tail may be amended. The entry keeps the same ID, page, section, and timestamp; only its message changes.
-
-Result: `{ entry: ProgressLogEntry }`. Destructive because it replaces stored text.
-
-### `delete_last_log`
-
-Input:
-
-```text
-book_id: string
-session_id: string
-expected_last_log_id: integer
-```
-
-Only the actual tail may be deleted. Result:
-
-```text
-{
-  deleted_log_id: integer
-  last_log_id: integer | null
-}
-```
-
-Deleting several unwanted entries requires guarded calls from newest to oldest. Destructive.
+Result: `SessionSummary`.
 
 ## Deck tools
 

@@ -14,8 +14,8 @@ SQLite is the canonical store. The source PDF and converter output are temporary
 - `book_id`, `session_id`, and `card_id` are service-generated UUIDs in canonical lowercase text form.
 - `deck_id` is supplied by the caller and must match `[a-z0-9][a-z0-9_-]{0,63}`. It is unique within a book.
 - IDs are stable and are never derived from editable titles.
-- Blank titles, card fronts, card backs, sections, and log messages are rejected after trimming, except that an unset current section is represented by `NULL`.
-- No creation or update timestamps are stored for books, cursors, decks, or cards. A progress-log timestamp is stored because it is part of the entry context established in `PLAN.md`.
+- Blank titles, card fronts, card backs, and sections are rejected after trimming, except that an unset current section is represented by `NULL`.
+- No creation or update timestamps are stored for books, cursors, decks, or cards.
 - The schema intentionally has no tags, card order, card type, difficulty, explanation, hints, review statistics, or similar enrichment fields.
 
 ## Initial DDL
@@ -67,23 +67,6 @@ CREATE TABLE study_sessions (
     FOREIGN KEY (book_id, page_index)
         REFERENCES book_pages (book_id, page_index)
 ) WITHOUT ROWID;
-
-CREATE TABLE progress_logs (
-    log_id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id     TEXT NOT NULL,
-    session_id  TEXT NOT NULL,
-    page_index  INTEGER NOT NULL CHECK (page_index >= 1),
-    section     TEXT NULL,
-    message     TEXT NOT NULL CHECK (length(trim(message)) > 0),
-    logged_at   TEXT NOT NULL CHECK (length(trim(logged_at)) > 0),
-    FOREIGN KEY (book_id, session_id)
-        REFERENCES study_sessions (book_id, session_id) ON DELETE CASCADE,
-    FOREIGN KEY (book_id, page_index)
-        REFERENCES book_pages (book_id, page_index)
-);
-
-CREATE INDEX progress_logs_by_stream
-    ON progress_logs (book_id, session_id, log_id);
 
 CREATE TABLE decks (
     book_id     TEXT NOT NULL,
@@ -144,27 +127,19 @@ A successful import inserts the book, every rendered page, and every TOC entry i
 
 An empty TOC is valid. `get_book` returns the book metadata and TOC entries ordered by `position`. It never returns `image_data`.
 
-`remove_book` deletes the book row. Foreign-key cascades hard-delete its pages, TOC, cursor state, progress logs, decks, and card revisions. It does not delete the caller's source PDF.
+`remove_book` deletes the book row. Foreign-key cascades hard-delete its pages, TOC, cursor state, decks, and card revisions. It does not delete the caller's source PDF.
 
-### Study sessions and reading progress
+### Study sessions
 
 A study session is a durable, named reading thread for one book. It is not an LLM process, chat connection, user account, or permission boundary. Any later agent or chat can resume it by using its `session_id`.
 
 Creating a session generates its UUID and stores page 1 with no current section. Session names are trimmed and unique within a book under case-insensitive comparison. They are editable display metadata; renaming a session never changes its ID.
 
-`list_sessions` exposes each session's name, current page, current section, and latest progress-log entry so an agent can recognize which thread to resume. Deleting a session hard-deletes only that session's cursor and progress log. It does not delete the book, decks, or cards.
+`list_sessions` exposes each session's name, current page, and current section so an agent can recognize which thread to resume. Deleting a session hard-deletes only that session's cursor. It does not delete the book, decks, or cards.
 
-Navigation compares the caller's `expected_page_index` to the stored session page before writing. A mismatch changes nothing. Different sessions for the same book have independent cursors and logs; multiple agents deliberately using the same session share its state and are protected by the existing cursor and log-tail checks.
+Navigation compares the caller's `expected_page_index` to the stored session page before writing. A mismatch changes nothing. Different sessions for the same book have independent cursors. Multiple agents deliberately using the same session share its state and are protected by the cursor check.
 
 `current_section` is agent-supplied free text. The service does not infer it from the TOC. Setting the same normalized value again is idempotent. Passing JSON `null` clears the section.
-
-### Progress log
-
-`log_id` is globally monotonic because the table uses `AUTOINCREMENT`; a deleted ID is never reused. Ordering within a session stream is by `log_id`.
-
-An append captures the cursor's current `page_index`, current section, and a service-generated UTC RFC 3339 timestamp. It succeeds only if `expected_last_log_id` equals the stream's actual tail ID, where both are `null` when the stream is empty.
-
-An amendment is allowed only for the guarded tail entry. It changes only `message` and preserves the entry's `log_id`, page, section, and timestamp. A deletion is also tail-only and removes exactly one entry. Correcting several entries therefore requires repeated guarded deletions from newest to oldest.
 
 ### Decks and cards
 

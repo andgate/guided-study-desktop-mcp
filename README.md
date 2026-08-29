@@ -10,8 +10,8 @@ The version-one contract is implemented as:
 - a Streamable HTTP MCP endpoint at `http://127.0.0.1:7331/mcp`;
 - one canonical SQLite database under `%LOCALAPPDATA%\GuidedStudy`;
 - a bundled converter executable that renders PDFs through PyMuPDF and emits temporary page images plus `toc.csv`;
-- 30 focused MCP tools covering books, reading sessions/progress, decks, and immutable card revisions;
-- the MCP-native Teach skill in [`teach/skills/teach`](teach/skills/teach/SKILL.md).
+- 27 focused MCP tools covering books, reading sessions, decks, and immutable card revisions;
+- the MCP-native Noggin skill in [`teach-plugin`](teach-plugin/SKILL.md).
 
 The source PDF is never modified, deleted, or retained in SQLite. Failed conversion or validation cannot expose a partial book.
 
@@ -74,7 +74,7 @@ Format the Go and Python source files with:
 task format
 ```
 
-Run the executable from the repository root so it can use `converter\prepare_book.py`, or pass that script's path with `--converter`. Tests cover transactional storage, independent cursors, guarded progress logs, immutable card history, atomic batch deletion, MCP discovery/schemas/annotations, structured conflicts, and image content. The Python test verifies contiguous page output and compact TOC generation.
+Run the executable from the repository root so it can use `converter\prepare_book.py`, or pass that script's path with `--converter`. Tests cover transactional storage, independent cursors, immutable card history, atomic batch deletion, MCP discovery/schemas/annotations, structured conflicts, and image content. The Python test verifies contiguous page output and compact TOC generation.
 
 ## Connect an MCP client
 
@@ -88,22 +88,22 @@ The health probe is `GET /healthz`.
 
 The `import_book.file_reference` input is the absolute path to the local PDF supplied by the host.
 
-## Install Teach locally
+## Install Noggin locally
 
-Connecting the MCP server exposes storage and navigation tools, but it does not install the teaching workflow. Install or refresh Teach for the current Windows user with:
+Connecting the MCP server exposes storage and navigation tools, but it does not install the teaching workflow. Install or refresh Noggin for the current Windows user with:
 
 ```powershell
 task plugin:install
 ```
 
-The task runs `python scripts/install_plugin.py` in the global Python environment. It validates the skill from `teach\skills\teach` and installs it at `%USERPROFILE%\.agents\skills\teach`, making it available outside this repository. The installer does not require the Codex CLI.
+The task runs `python scripts/install_plugin.py` in the global Python environment. It validates the skill from `teach-plugin` and installs it at `%USERPROFILE%\.agents\skills\noggin`, making it available outside this repository. The installer does not require the Codex CLI.
 
 Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable HTTP server named `guided_study` with URL `http://127.0.0.1:7331/mcp`. Start a new conversation after installing or refreshing the plugin so the client discovers the updated skill.
 
 ## Data and recovery
 
-SQLite contains book metadata, TOC entries, rendered page BLOBs, named session cursors/logs, deck metadata, and immutable card revisions. Use any SQLite viewer for inspection. Explicit exports are not part of version one.
+SQLite contains book metadata, TOC entries, rendered page BLOBs, named session cursors, deck metadata, and immutable card revisions. Use any SQLite viewer for inspection. Explicit exports are not part of version one.
 
-Deleting a session, log tail, card, deck, or book is immediate and permanent. Destructive MCP annotations accurately mark those operations. Deleting an imported book never touches its original PDF.
+Deleting a session, card, deck, or book is immediate and permanent. Destructive MCP annotations accurately mark those operations. Deleting an imported book never touches its original PDF.
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md), [SCHEMA.md](docs/SCHEMA.md), and [MCP.md](docs/MCP.md) for the implementation boundaries and version-one contracts.

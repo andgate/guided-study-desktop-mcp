@@ -17,7 +17,7 @@ tasks:
       - go clean
 
   plugin:install:
-    desc: Install or refresh the Teach plugin for the current user
+    desc: Install or refresh Noggin for the current user
     platforms: [windows]
     cmds:
       - python scripts/install_plugin.py

@@ -25,13 +25,13 @@ The temporary conversion directory is removed on success and failure. Go treats 
 - `internal/store`: DDL, domain models, validation, transactions, optimistic concurrency, and all canonical data access.
 - `internal/mcpserver`: typed tool schemas, descriptions, annotations, structured results/errors, and image content.
 - `converter`: the PyMuPDF renderer, frozen as `pdf-converter.exe` and invoked directly by the local application.
-- `teach/skills/teach`: the teaching workflow that consumes the MCP API.
+- `teach-plugin`: the Noggin workflow that consumes the MCP API.
 
 ## State boundaries
 
 A book has a stable generated UUID, ordered pages, optional ordered TOC entries, zero or more named sessions, and zero or more caller-named decks. There is no selected book or implicit session.
 
-Session navigation checks `expected_page_index` in the same transaction as the cursor update. Progress-log appends, amendments, and deletions check the expected tail ID. Deck metadata uses its own revision. Card updates insert immutable revisions; deletion removes the full logical card history only after checking the latest revision.
+Session navigation checks `expected_page_index` in the same transaction as the cursor update. Deck metadata uses its own revision. Card updates insert immutable revisions; deletion removes the full logical card history only after checking the latest revision.
 
 SQLite uses one application connection, foreign keys on, a busy timeout, and bounded transactions. IDs and titles have separate roles: UUIDs and `deck_id` values are stable identity; titles and session names are editable display metadata.
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-SKILL_NAME = "teach"
+SKILL_NAME = "noggin"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_SKILL = REPO_ROOT / "teach-plugin"
 USER_SKILLS = Path.home() / ".agents" / "skills"
