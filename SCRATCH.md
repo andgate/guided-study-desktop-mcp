@@ -1,0 +1,148 @@
+# Page Navigation With Extracted Outlines
+
+## Status
+
+This file is the complete implementation plan for the current task. Translate
+these requirements into suitable implementation details during development.
+
+The current checkout already implements durable, section-based navigation. The
+new task changes navigation back to pages while preserving the rest of the new
+system, especially its durable study-session model.
+
+## Approved import behavior
+
+- `import_book` receives the PDF reference and book title.
+- The service extracts the PDF outline during import.
+- The service performs no PDF outline validation, repair, reconciliation,
+  enrichment, or generation.
+- If no outline information can be extracted, `import_book` fails with
+  `outline_required`.
+- If extracted outline data cannot be stored unchanged, `import_book` fails
+  with `outline_unusable`: `PDF outline cannot be stored.`
+- Noggin reports that the book cannot be imported and stops the import flow.
+- Noggin offers no AI-agent outline generation or repair fallback.
+- Page rendering and outline storage remain one atomic import. A failed import
+  stores no partial book.
+
+## Approved outline storage
+
+Store a flat ordered outline for quick page lookup:
+
+```text
+outline_index
+title
+page_index
+```
+
+`outline_index` preserves extraction order. `page_index` is the 1-based
+physical PDF page. Store no depth, hierarchy, parent data, end page, section
+range, or graph.
+
+The outline helps the agent find headings and pages. It does not define
+teaching units, coverage boundaries, or checkpoint identity.
+
+The backend does not derive checkpoint headings from outline entries.
+
+`get_book` exposes this outline as an RFC 4180 CSV string. It is a string in
+the tool result, not a `.csv` file for the agent to create. Its header is:
+
+```text
+outline_index,title,page_index
+```
+
+## Approved guided-reading behavior
+
+- Preserve durable named study sessions.
+- Preserve existing session management unless the user approves a specific
+  change.
+- Replace section-to-section traversal with consecutive page batches.
+- Each batch contains at most five rendered pages.
+- A session start or explicit page jump makes the chosen page the batch origin.
+- The start or jump operation returns the first rendered batch immediately.
+- The first batch starts at the chosen page. Later batches remain aligned to
+  that origin.
+- A page jump resets the origin and begins a new batch window.
+- A page jump clears the checkpoint heading.
+- Store the origin with the session. Do not store the computed batch window.
+
+Compute the batch containing the checkpoint and its successor with:
+
+```text
+batch_start = origin + floor((checkpoint - origin) / 5) * 5
+batch_end = min(batch_start + 4, page_count)
+next_batch_start = batch_start + 5
+next_batch_end = min(next_batch_start + 4, page_count)
+```
+
+Compute the midpoint preload trigger with:
+
+```text
+batch_size = batch_end - batch_start + 1
+trigger_position = floor(batch_size / 2) + 1
+trigger_page_index = batch_start + trigger_position - 1
+```
+
+- Trigger before asking the first question whose source pages include that
+  midpoint page.
+- Run this preload before the agent performs the next guided-reading loop step.
+- Preloading adds the next consecutive batch to context without moving the
+  teaching discussion.
+- Guided teaching moves linearly through the rendered pages.
+- The physical page is the authoritative checkpoint position.
+- A new session begins with its checkpoint heading unset.
+- Save a useful section heading extracted by the agent from the rendered page
+  with the checkpoint.
+- The checkpoint heading is resume context, not an outline identity.
+- `continue_reading` receives the current physical page and heading. It saves
+  that checkpoint and loads the next consecutive batch as one operation.
+- `continue_reading` reports page batches, not section completion.
+- `continue_reading` mutates the durable session only when it successfully
+  loads a next batch.
+- At the final batch, `continue_reading` returns `no_next_batch` without saving
+  the checkpoint. Use `save_checkpoint` instead.
+- `save_checkpoint` saves the physical page and heading without loading pages.
+- Save a checkpoint when the learner reaches a new section, even when no
+  preload is due.
+- Resume from the session's stored origin, checkpoint page, and checkpoint
+  heading. Reload the batch containing the checkpoint, then apply the midpoint
+  preload rule when the checkpoint has reached its trigger page.
+- Preserve one-question-at-a-time teaching, answer evaluation, comprehension
+  questions, coverage, source labels, and excluded-material rules.
+- Preserve arbitrary session-independent `read_pages` behavior.
+- Preserve the absence of session completion bureaucracy.
+
+## Removed behavior
+
+- Agent-generated section sequences
+- AI-agent outline generation or repair
+- Exact section ranges generated by the agent
+- Section-by-section reading traversal
+- Outline depth and hierarchy
+- Stable section IDs in reading checkpoints
+- Section-range navigation tools
+
+## Implementation order
+
+1. Inspect the current section-navigation implementation and identify the
+   smallest changes that preserve durable sessions.
+2. Choose implementation details that satisfy this plan and fit the existing
+   code.
+3. Implement converter, storage, MCP, documentation, tests, and Noggin prompt
+   changes.
+4. Present the complete unstaged changes for review.
+
+Database migration and schema compatibility are out of scope.
+
+## Project constraints
+
+- Work directly in the saved project checkout.
+- Git worktrees are banned.
+- Preserve every unrelated staged, unstaged, and untracked change.
+- Do not edit `docs/plan/`.
+- Do not run tests or builds without explicit permission.
+- Do not install or refresh Noggin without explicit permission.
+- Do not delete or migrate the local database without explicit permission.
+- Do not start or stop binaries without explicit permission.
+- Do not stage, commit, reset, clean, or revert without explicit permission.
+- `noggin-plugin/references/flashcard-best-practices.md` is permanently off
+  limits.

@@ -9,11 +9,12 @@ The version-one contract is implemented as:
 - one Go/Fyne system-tray application;
 - a Streamable HTTP MCP endpoint at `http://127.0.0.1:7331/mcp`;
 - one canonical SQLite database under `%LOCALAPPDATA%\GuidedStudy`;
-- a bundled converter executable that renders PDFs through PyMuPDF and emits temporary page images plus `toc.csv`;
-- 27 focused MCP tools covering books, reading sessions, decks, and immutable card revisions;
+- a bundled converter executable that imports PDFs transactionally through PyMuPDF and SQLite;
+- 24 focused MCP tools covering books, reading sessions, decks, and immutable card revisions;
 - the MCP-native Noggin skill in [`noggin-plugin`](noggin-plugin/SKILL.md).
 
-The source PDF is never modified, deleted, or retained in SQLite. Failed conversion or validation cannot expose a partial book.
+The source PDF is never modified, deleted, or retained in SQLite. Failed
+rendering or insertion cannot expose a partial book.
 
 ## Prerequisites
 
@@ -74,7 +75,11 @@ Format the Go and Python source files with:
 task format
 ```
 
-Run the executable from the repository root so it can use `converter\prepare_book.py`, or pass that script's path with `--converter`. Tests cover transactional storage, independent cursors, immutable card history, atomic batch deletion, MCP discovery/schemas/annotations, structured conflicts, and image content. The Python test verifies contiguous page output and compact TOC generation.
+Run the executable from the repository root so it can use
+`converter\prepare_book.py`, or pass that script's path with `--converter`.
+Tests cover transactional imports, page batching, independent sessions,
+window resets, immutable card history, atomic batch deletion, MCP schemas,
+structured errors, and image content.
 
 ## Connect an MCP client
 
@@ -102,7 +107,9 @@ Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable 
 
 ## Data and recovery
 
-SQLite contains book metadata, TOC entries, rendered page BLOBs, named session cursors, deck metadata, and immutable card revisions. Use any SQLite viewer for inspection. Explicit exports are not part of version one.
+SQLite contains book metadata, PDF outlines, rendered page BLOBs, durable
+session progress, deck metadata, and immutable card revisions. Use any SQLite
+viewer for inspection. Explicit exports are not part of version one.
 
 Deleting a session, card, deck, or book is immediate and permanent. Destructive MCP annotations accurately mark those operations. Deleting an imported book never touches its original PDF.
 

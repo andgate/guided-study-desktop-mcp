@@ -11,33 +11,50 @@ ChatGPT / MCP client
         v
 Go MCP service ----> SQLite (canonical state and rendered page BLOBs)
         |
-        | bounded subprocess per import
+        | JSON request and result
         v
-Bundled converter (Python + PyMuPDF) ----> temporary images + toc.csv
+Bundled converter (Python + PyMuPDF) ----> SQLite transaction
 ```
 
-The temporary conversion directory is removed on success and failure. Go treats every staged file as untrusted, validates names, continuity, MIME types, TOC shape/references, and size limits, then ingests the entire book in one transaction.
+The converter opens the PDF and SQLite database. It extracts the PDF outline
+and inserts the book, lazily rendered page BLOBs, and flat outline in one
+transaction. Failed extraction, rendering, or insertion rolls back the complete
+import. No page-image or CSV staging files are created.
 
 ## Packages
 
 - `internal/appconfig`: flags, default path discovery, and loopback binding policy.
-- `internal/importer`: local file-reference resolution, converter subprocess execution, and staging validation.
-- `internal/store`: DDL, domain models, validation, transactions, optimistic concurrency, and all canonical data access.
+- `internal/importer`: converter request encoding, subprocess execution, diagnostics, and result decoding.
+- `internal/store`: DDL, domain models, runtime transactions, and canonical study-data access.
 - `internal/mcpserver`: typed tool schemas, descriptions, annotations, structured results/errors, and image content.
-- `converter`: the PyMuPDF renderer, frozen as `pdf-converter.exe` and invoked directly by the local application.
+- `converter`: the transactional PDF import writer, frozen as `pdf-converter.exe`.
 - `noggin-plugin`: the Noggin workflow that consumes the MCP API.
 
 ## State boundaries
 
-A book has a stable generated UUID, ordered pages, optional ordered TOC entries, zero or more named sessions, and zero or more caller-named decks. There is no selected book or implicit session.
+A book has a stable generated UUID, ordered pages, a flat extracted outline,
+zero or more named sessions, and zero or more caller-named decks.
+There is no selected book or implicit session.
 
-Session navigation checks `expected_page_index` in the same transaction as the cursor update. Deck metadata uses its own revision. Card updates insert immutable revisions; deletion removes the full logical card history only after checking the latest revision.
+Each session stores a page-window origin, physical checkpoint page, and nullable
+agent-supplied heading. Batch windows are computed from the origin and are never
+stored. `continue_reading` saves a checkpoint and preloads the following batch
+atomically. Deck metadata uses its own revision. Card updates insert immutable
+revisions; deletion removes the full logical card history only after checking
+the latest revision.
 
-SQLite uses one application connection, foreign keys on, a busy timeout, and bounded transactions. IDs and titles have separate roles: UUIDs and `deck_id` values are stable identity; titles and session names are editable display metadata.
+Go uses one application SQLite connection. Each import opens one converter
+connection with foreign keys enabled and a busy timeout. The importer serializes
+converter processes so only one import transaction writes at a time. IDs and
+display names have separate roles: UUIDs and `deck_id` values are stable
+identity; book titles, deck titles, and session names are editable metadata.
 
 ## MCP behavior
 
-All ordinary results include concise text plus `structuredContent`. `current_page`, `next_page`, `prev_page`, and `goto_page` additionally include one MCP image content block without duplicating image bytes in structured data.
+All ordinary results include concise text plus `structuredContent`.
+`read_pages`, `create_session`, `goto_page`, and `continue_reading`
+additionally include labeled MCP image content blocks without duplicating image
+bytes in structured data.
 
 Every tool advertises inferred or explicit JSON input/output schemas. Unknown fields are rejected by schema validation. Read-only and destructive annotations match actual behavior; every tool is closed-world because version one affects only the local library.
 
@@ -47,4 +64,5 @@ Domain errors use stable codes from `MCP.md` and return `isError: true`, short t
 
 Version one is a trusted single-user local service with no authentication. It only binds to loopback addresses and cannot be exposed to other computers through configuration. It is built and run locally from this repository; there is no installation or deployment stage.
 
-The Fyne executable is the only long-running application. Python is conversion machinery invoked by Go, not a service, controller, or canonical data owner.
+The Fyne executable is the only long-running application. Python is conversion
+machinery invoked by Go and writes canonical import data transactionally.

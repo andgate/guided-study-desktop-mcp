@@ -2,9 +2,10 @@
 
 ## Status
 
-This document is the version-one storage contract for the local proof of concept. It refines `PLAN.md`; it does not describe an implemented database yet.
+This document is the storage contract for the local service.
 
-SQLite is the canonical store. The source PDF and converter output are temporary inputs only. Explicit exports are derivatives and are not read back as canonical state.
+SQLite is the canonical store. The source PDF is an external import input.
+Explicit exports are derivatives and are not read back as canonical state.
 
 ## Conventions
 
@@ -14,7 +15,7 @@ SQLite is the canonical store. The source PDF and converter output are temporary
 - `book_id`, `session_id`, and `card_id` are service-generated UUIDs in canonical lowercase text form.
 - `deck_id` is supplied by the caller and must match `[a-z0-9][a-z0-9_-]{0,63}`. It is unique within a book.
 - IDs are stable and are never derived from editable titles.
-- Blank titles, card fronts, card backs, and sections are rejected after trimming, except that an unset current section is represented by `NULL`.
+- Blank titles, outline titles, checkpoint headings, card fronts, and card backs are rejected after trimming.
 - No creation or update timestamps are stored for books, cursors, decks, or cards.
 - The schema intentionally has no tags, card order, card type, difficulty, explanation, hints, review statistics, or similar enrichment fields.
 
@@ -38,34 +39,41 @@ CREATE TABLE book_pages (
     FOREIGN KEY (book_id) REFERENCES books (book_id) ON DELETE CASCADE
 ) WITHOUT ROWID;
 
-CREATE TABLE toc_entries (
-    book_id    TEXT NOT NULL,
-    position   INTEGER NOT NULL CHECK (position >= 1),
-    depth      INTEGER NOT NULL CHECK (depth >= 0),
-    title      TEXT NOT NULL CHECK (length(trim(title)) > 0),
-    page_index INTEGER NOT NULL CHECK (page_index >= 1),
-    PRIMARY KEY (book_id, position),
+CREATE TABLE book_outline (
+    book_id      TEXT NOT NULL,
+    outline_index INTEGER NOT NULL CHECK (outline_index >= 0),
+    title        TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    page_index   INTEGER NOT NULL CHECK (page_index >= 1),
+    PRIMARY KEY (book_id, outline_index),
     FOREIGN KEY (book_id) REFERENCES books (book_id) ON DELETE CASCADE,
     FOREIGN KEY (book_id, page_index)
         REFERENCES book_pages (book_id, page_index) ON DELETE CASCADE
 ) WITHOUT ROWID;
 
-CREATE INDEX toc_entries_by_page
-    ON toc_entries (book_id, page_index, position);
+CREATE INDEX book_outline_by_page
+    ON book_outline (book_id, page_index, outline_index);
 
 CREATE TABLE study_sessions (
     book_id         TEXT NOT NULL,
     session_id      TEXT NOT NULL,
     name            TEXT NOT NULL COLLATE NOCASE
         CHECK (length(trim(name)) > 0),
-    page_index      INTEGER NOT NULL DEFAULT 1 CHECK (page_index >= 1),
-    current_section TEXT NULL
-        CHECK (current_section IS NULL OR length(trim(current_section)) > 0),
+    origin_page_index INTEGER NOT NULL
+        CHECK (origin_page_index >= 1),
+    checkpoint_page_index INTEGER NOT NULL
+        CHECK (checkpoint_page_index >= 1),
+    checkpoint_heading TEXT NULL
+        CHECK (
+            checkpoint_heading IS NULL
+            OR length(trim(checkpoint_heading)) > 0
+        ),
     PRIMARY KEY (book_id, session_id),
     UNIQUE (book_id, name),
     FOREIGN KEY (book_id) REFERENCES books (book_id) ON DELETE CASCADE,
-    FOREIGN KEY (book_id, page_index)
-        REFERENCES book_pages (book_id, page_index)
+    FOREIGN KEY (book_id, origin_page_index)
+        REFERENCES book_pages (book_id, page_index) ON DELETE CASCADE,
+    FOREIGN KEY (book_id, checkpoint_page_index)
+        REFERENCES book_pages (book_id, page_index) ON DELETE CASCADE
 ) WITHOUT ROWID;
 
 CREATE TABLE decks (
@@ -115,31 +123,53 @@ WHERE NOT EXISTS (
 
 ## Table behavior and invariants
 
-### Books, pages, and TOC
+### Books, pages, and outlines
 
-A successful import inserts the book, every rendered page, and every TOC entry in one transaction. Before committing, Go validates that:
+A successful import inserts the book, every rendered page, and every extracted
+outline entry in one converter-owned SQLite transaction.
 
-- pages are numbered contiguously from 1 through `books.page_count`;
-- every image MIME type is supported by the MCP page-result implementation;
-- every TOC `position` is contiguous from 1;
-- every TOC `page_index` names an ingested page;
-- depth values are non-negative.
+`outline_index` is zero-based and preserves PDF extraction order. Each outline
+entry retains its extracted title and 1-based physical page. No hierarchy,
+parent, depth, end page, or page range is stored.
 
-An empty TOC is valid. `get_book` returns the book metadata and TOC entries ordered by `position`. It never returns `image_data`.
+`get_book` returns book metadata and an RFC 4180 outline CSV ordered by
+`outline_index`. It never returns `image_data`.
 
-`remove_book` deletes the book row. Foreign-key cascades hard-delete its pages, TOC, cursor state, decks, and card revisions. It does not delete the caller's source PDF.
+`remove_book` deletes the book row. Foreign-key cascades hard-delete its pages,
+outline entries, session state, decks, and card revisions. It does not delete the
+caller's source PDF.
 
 ### Study sessions
 
 A study session is a durable, named reading thread for one book. It is not an LLM process, chat connection, user account, or permission boundary. Any later agent or chat can resume it by using its `session_id`.
 
-Creating a session generates its UUID and stores page 1 with no current section. Session names are trimmed and unique within a book under case-insensitive comparison. They are editable display metadata; renaming a session never changes its ID.
+Creating a session requires a physical start page. It stores that page as both
+the batch origin and initial checkpoint, with a null heading. Session names are
+trimmed and unique within a book under case-insensitive comparison. Renaming a
+session never changes its ID or checkpoint.
 
-`list_sessions` exposes each session's name, current page, and current section so an agent can recognize which thread to resume. Deleting a session hard-deletes only that session's cursor. It does not delete the book, decks, or cards.
+`list_sessions` exposes the stored origin, physical checkpoint page, and
+nullable agent-supplied heading. Deleting a session hard-deletes only that state.
+It does not delete the book, decks, or cards.
 
-Navigation compares the caller's `expected_page_index` to the stored session page before writing. A mismatch changes nothing. Different sessions for the same book have independent cursors. Multiple agents deliberately using the same session share its state and are protected by the cursor check.
+`goto_page` stores the selected page as the origin and checkpoint, clears the
+heading, and returns the batch starting on that page. `save_checkpoint` updates
+the physical page and heading without loading pages. `continue_reading`
+validates and saves a supplied checkpoint while returning the deterministic
+batch after the one containing that page. No delivered-page window or
+completion state is stored.
 
-`current_section` is agent-supplied free text. The service does not infer it from the TOC. Setting the same normalized value again is idempotent. Passing JSON `null` clears the section.
+Batch size is capped at five pages. The batch grid starts at the stored origin
+and continues through the final physical page without overlap. A request beyond
+the final available batch returns `no_next_batch` without changing the
+checkpoint.
+
+```text
+batch_start = origin + floor((checkpoint - origin) / 5) * 5
+batch_end = min(batch_start + 4, page_count)
+next_batch_start = batch_start + 5
+next_batch_end = min(next_batch_start + 4, page_count)
+```
 
 ### Decks and cards
 
@@ -155,14 +185,24 @@ Current cards are obtained through `current_cards`. Listing and export sort by `
 
 ## Python converter handoff
 
-The converter receives an input PDF path or readable reference resolved by Go and a newly created temporary output directory. On success it writes:
+Go sends one JSON request through standard input containing:
 
-- one image per page, named `page-0001.<ext>`, `page-0002.<ext>`, and so on without gaps;
-- `toc.csv` with the exact header `position,depth,title,page_index`.
+- the SQLite database path;
+- the PDF file reference;
+- the book title;
+- render settings.
 
-The converter exits nonzero on failure and writes diagnostics to standard error. It must not write canonical SQLite state, retain the source PDF, or emit split PDFs.
+The converter opens the PDF, extracts its outline, then opens the database and
+begins one transaction. It lazily feeds rendered page BLOBs into
+`sqlite3.executemany()` and inserts the flat outline after all pages. Memory
+remains bounded to roughly one rendered page.
 
-Go treats converter output as untrusted staging data. It validates file names, image formats, page continuity, CSV shape, TOC references, and configured size limits before beginning the ingest transaction. After success or failure, Go removes only the temporary directory it created. The original PDF is never copied into the database and never deleted or modified.
+After commit, the converter writes one JSON `BookSummary` to standard output.
+Missing outlines return `outline_required`. Extracted outlines that cannot be
+stored unchanged return `outline_unusable`. Failures roll back the transaction,
+write structured diagnostics to standard error, and exit nonzero. No temporary
+page-image or CSV files are created. The source PDF is never deleted or
+modified.
 
 ## Deliberately absent
 

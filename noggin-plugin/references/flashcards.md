@@ -3,26 +3,37 @@
 Create flashcards independently from guided-reading sessions. Do not require a
 session or use its cursor.
 
-If the request occurs during active guided reading, recommend a fresh chat and
-give the learner a prompt they can paste directly. Name the actual book, source
-scope, and deck arrangement. For example:
+```mermaid
+flowchart TD
+    A["Flashcard request"] --> B{"Is guided reading active in this chat?"}
+    B -- "No" --> C["Begin flashcard creation"]
+    B -- "Yes" --> D["Recommend a fresh chat and provide a customized prompt"]
+    D --> E{"Does the learner prefer the fresh chat?"}
+    E -- "Yes" --> F["Continue there with the provided prompt"]
+    E -- "No" --> C
+```
+
+Name the actual book, source scope, and deck arrangement in the prompt. For
+example:
 
 `@Noggin generate a flashcard deck for Chapter 3 of LLMs for Dummies`
 
-Continue in the current chat when the learner insists.
-
 ## Generate decks
 
-1. Use the learner's requested source scope and deck arrangement.
-2. Call `list_books` unless the learner supplied an unambiguous `book_id`.
-3. Call `get_book` and use its table of contents to locate the complete scope.
-4. List existing decks when the destination is uncertain.
-5. Create or select every requested destination deck.
-6. Call `read_pages` for the next five consecutive source pages.
-7. Extract every complete retrieval target supported by the batch.
-8. Save the batch immediately through `add_cards`, once per receiving deck.
-9. Repeat steps 6–8 with the next consecutive page batch until every page in
-   the requested scope has been processed.
+```mermaid
+flowchart TD
+    A["Resolve the requested book and complete source scope with list_books and get_book"] --> B{"Is the destination deck arrangement clear?"}
+    B -- "No" --> C["List existing decks"]
+    B -- "Yes" --> D["Create or select every destination deck"]
+    C --> D
+    D --> E["Call read_pages for the next five consecutive source pages"]
+    E --> F["Extract every complete retrieval target supported by the batch"]
+    F --> G["Assign each target to its receiving deck"]
+    G --> H["Call add_cards once per receiving deck"]
+    H --> I{"Does the requested source scope have pages remaining?"}
+    I -- "Yes" --> E
+    I -- "No" --> J["Finish deck creation"]
+```
 
 Use one deck unless the learner requests several logically divided decks.
 Honor the requested divisions throughout the source scope.

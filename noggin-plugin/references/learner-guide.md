@@ -6,9 +6,12 @@ recall.
 
 The system separates two kinds of work:
 
-```text
-guided reading -> discussion -> understanding
-understanding -> flashcard creation -> later recall
+```mermaid
+flowchart LR
+    A["Guided reading"] --> B["Discussion"]
+    B --> C["Understanding"]
+    C --> D["Flashcard creation"]
+    D --> E["Later recall"]
 ```
 
 Guided reading develops the conceptual structure. Flashcards preserve selected
@@ -17,18 +20,25 @@ parts of that structure after the material makes sense.
 ## Start or resume
 
 Name the book, chapter, or section you want to study. The agent can create a
-named study session or resume an existing one. A session remembers the book and
-current section across chats.
+named study session or resume an existing one. A session remembers the book,
+page-window origin, physical checkpoint page, and rendered heading across
+chats.
 
-When a new chat resumes partway through a section, the agent restarts that
-section. This keeps the section's questions and explanations coherent without
-reconstructing an unfinished exchange from an earlier chat.
+When a new chat resumes, the agent reloads the page batch containing its
+durable checkpoint. Reaching the end of the book does not close the session.
+
+## Prepare a book
+
+Book preparation is separate from guided reading. The service renders the PDF
+and extracts its existing outline in one import. A PDF without an extractable,
+storable outline cannot be imported. The agent does not generate or repair an
+outline.
 
 ## Why questions come first
 
-After the section has been loaded, one purposeful question begins the study
-loop. The question provides a target for attention, so discussion becomes a
-search for an idea, relationship, mechanism, distinction, or consequence.
+After the first pages have been loaded, one purposeful question begins the
+study loop. The question provides a target for attention, so discussion becomes
+a search for an idea, relationship, mechanism, distinction, or consequence.
 
 The experience is an intellectual Easter egg hunt: you know what you are
 currently looking for. The question guides attention while the book remains
@@ -36,16 +46,20 @@ the authority for the answer.
 
 ## What guided reading feels like
 
-The agent reports the current section before every study question. It asks one
-question at a time and moves linearly through the sections.
+```mermaid
+flowchart TD
+    A["Load the current reading window"] --> B["Ask one comprehension question"]
+    B --> C["Discuss the learner's answer"]
+    C --> D{"Is the question fully answered?"}
+    D -- "No" --> C
+    D -- "Yes" --> E{"Does important material remain?"}
+    E -- "Yes" --> B
+    E -- "No" --> F["End the reading run"]
+```
 
-A short section may need one question. A dense section may require several
-sequential questions. The agent advances after the important material in the
-section has been sufficiently covered.
-
-Pages are loaded in consecutive batches of up to five before the question loop
-begins. This keeps the section available while ideas, figures, tables, and
-examples receive the attention they require.
+The agent reports the current rendered heading and source page or pages before
+every question. Later pages load in consecutive batches without moving the
+discussion forward.
 
 ## Discuss answers
 
@@ -63,12 +77,14 @@ direction.
 ## Control the session
 
 You can direct the agent to skip, slow down, move faster, change sections,
-switch books, change workflows, or stop. Your direction controls the study
-session.
+switch books, change workflows, or stop. The outline helps the agent locate a
+requested heading. An explicit jump makes the chosen physical page the start
+of a new reading window. Your direction controls the study session.
 
-Prepared books provide ordered sections and rendered page images. The service
-stores the current section, while the agent interprets the material, chooses
-questions, evaluates answers, and decides when the section has been covered.
+Prepared books provide an extracted outline and rendered page images. The
+service stores the window origin, physical checkpoint page, and heading the
+agent read from the rendered page. The agent interprets the material, chooses
+questions, evaluates answers, and decides when enough has been covered.
 
 ## Create flashcards
 

@@ -1,16 +1,12 @@
 package importer
 
 import (
+	"bytes"
 	"context"
-	"encoding/csv"
+	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
+	"io"
 	"os/exec"
-	"path/filepath"
-	"regexp"
-	"slices"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -18,313 +14,156 @@ import (
 )
 
 const (
-	defaultDPI           = 200
-	defaultJPEGQuality   = 90
-	defaultMaxPages      = 2500
-	defaultMaxImageBytes = int64(25 << 20)
-	defaultMaxTotalBytes = int64(4 << 30)
+	defaultDPI         = 200
+	defaultJPEGQuality = 90
+	converterLimit     = 1
 )
-
-var tocHeader = [...]string{
-	"position",
-	"depth",
-	"title",
-	"page_index",
-}
 
 type Config struct {
 	ConverterPath string
-	TempRoot      string
+	DatabasePath  string
 	DPI           int
 	JPEGQuality   int
-	MaxPages      int
-	MaxImageBytes int64
-	MaxTotalBytes int64
 }
 
-// Importer prepares PDFs for storage.
-type Importer struct{ config Config }
+type renderConfig struct {
+	DPI         int `json:"dpi"`
+	JPEGQuality int `json:"jpeg_quality"`
+}
+
+type convertRequest struct {
+	DatabasePath  string       `json:"database_path"`
+	FileReference string       `json:"file_reference"`
+	Title         string       `json:"title"`
+	Render        renderConfig `json:"render"`
+}
+
+type convertFailure struct {
+	Code string `json:"code"`
+}
+
+// Importer runs the bundled converter.
+type Importer struct {
+	config Config
+	gate   chan struct{}
+}
 
 func New(config Config) *Importer {
-	// Apply defaults for omitted settings.
 	if config.DPI == 0 {
 		config.DPI = defaultDPI
 	}
 	if config.JPEGQuality == 0 {
 		config.JPEGQuality = defaultJPEGQuality
 	}
-	if config.MaxPages == 0 {
-		config.MaxPages = defaultMaxPages
+	return &Importer{
+		config: config,
+		gate:   make(chan struct{}, converterLimit),
 	}
-	if config.MaxImageBytes == 0 {
-		config.MaxImageBytes = defaultMaxImageBytes
-	}
-	if config.MaxTotalBytes == 0 {
-		config.MaxTotalBytes = defaultMaxTotalBytes
-	}
-
-	return &Importer{config: config}
 }
 
-func (i *Importer) Prepare(
+func (i *Importer) Import(
 	ctx context.Context,
 	fileReference, title string,
-) (store.PreparedBook, error) {
-	title = strings.TrimSpace(title)
-	if title == "" {
-		return store.PreparedBook{}, &store.Error{
-			Code:    store.CodeInvalidArgument,
-			Message: "title must not be blank.",
-		}
+) (store.BookSummary, error) {
+	// Serialize database writers.
+	select {
+	case i.gate <- struct{}{}:
+		defer func() { <-i.gate }()
+	case <-ctx.Done():
+		return store.BookSummary{}, conversionError(
+			"wait for converter",
+			ctx.Err(),
+			"",
+		)
 	}
 
-	// Create a temporary directory for converter output.
-	staging, err := os.MkdirTemp(i.config.TempRoot, "guided-study-import-")
-	if err != nil {
-		return store.PreparedBook{}, &store.Error{
-			Code:    store.CodeStorageError,
-			Message: "Could not create conversion staging directory.",
-			Cause:   err,
-		}
+	request := convertRequest{
+		DatabasePath:  i.config.DatabasePath,
+		FileReference: fileReference,
+		Title:         title,
+		Render: renderConfig{
+			DPI:         i.config.DPI,
+			JPEGQuality: i.config.JPEGQuality,
+		},
 	}
 
-	// Delete files when the import finishes.
-	defer os.RemoveAll(staging)
-
-	// Configure the converter.
-	args := []string{
-		"--input", fileReference,
-		"--output", staging,
-		"--dpi", strconv.Itoa(i.config.DPI),
-		"--jpeg-quality", strconv.Itoa(i.config.JPEGQuality),
+	var input bytes.Buffer
+	if err := json.NewEncoder(&input).Encode(request); err != nil {
+		return store.BookSummary{}, conversionError("encode request", err, "")
 	}
 
-	// Stop canceled conversions.
-	cmd := exec.CommandContext(ctx, i.config.ConverterPath, args...)
+	var output bytes.Buffer
+	var diagnostics bytes.Buffer
+	cmd := exec.CommandContext(ctx, i.config.ConverterPath)
+	cmd.Stdin = &input
+	cmd.Stdout = &output
+	cmd.Stderr = &diagnostics
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 
-	// Capture converter errors.
-	diagnostics, err := cmd.CombinedOutput()
-	if err != nil {
-		return store.PreparedBook{}, &store.Error{
-			Code:    store.CodeConversionFailed,
-			Message: "PDF conversion failed.",
-			Details: map[string]any{
-				"diagnostics": strings.TrimSpace(string(diagnostics)),
-			},
-			Cause: err,
+	if err := cmd.Run(); err != nil {
+		if failure, ok := knownFailure(diagnostics.String()); ok {
+			failure.Cause = err
+			return store.BookSummary{}, failure
 		}
-	}
-
-	// Load the converted files.
-	prepared, err := i.loadStaging(staging, title)
-	if err != nil {
-		if e, ok := err.(*store.Error); ok {
-			return store.PreparedBook{}, e
-		}
-
-		return store.PreparedBook{}, &store.Error{
-			Code:    store.CodeConversionFailed,
-			Message: "Converter output was invalid.",
-			Details: map[string]any{"reason": err.Error()},
-			Cause:   err,
-		}
-	}
-
-	return prepared, nil
-}
-
-// imageName matches converter page filenames.
-var imageName = regexp.MustCompile(`^page-([0-9]{4,})\.(jpg|jpeg|png)$`)
-
-func (i *Importer) loadStaging(dir, title string) (store.PreparedBook, error) {
-	// Load the pages.
-	pages, err := i.loadPages(dir)
-	if err != nil {
-		return store.PreparedBook{}, err
-	}
-
-	// Load the table of contents.
-	toc, err := loadTOC(filepath.Join(dir, "toc.csv"), len(pages))
-	if err != nil {
-		return store.PreparedBook{}, err
-	}
-
-	// Return the book.
-	return store.PreparedBook{
-		Title: title,
-		Pages: pages,
-		TOC:   toc,
-	}, nil
-}
-
-func (i *Importer) loadPages(dir string) ([]store.PreparedPage, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	// Collect page images by page number.
-	pages := map[int]store.PreparedPage{}
-	var total int64
-	for _, entry := range entries {
-		// Skip the table of contents.
-		if entry.Name() == "toc.csv" {
-			continue
-		}
-
-		// Load and validate one page.
-		page, imageBytes, err := i.loadPage(dir, entry.Name())
-		if err != nil {
-			return nil, err
-		}
-
-		// Check the book size.
-		total += imageBytes
-		if total > i.config.MaxTotalBytes {
-			return nil, fmt.Errorf("prepared book exceeds total size limit")
-		}
-
-		// Reject duplicate page numbers.
-		if _, exists := pages[page.PageIndex]; exists {
-			return nil, fmt.Errorf("duplicate page %d", page.PageIndex)
-		}
-
-		// Save the page image.
-		pages[page.PageIndex] = page
-	}
-
-	// Check the page count.
-	pageCount := len(pages)
-	if pageCount == 0 || pageCount > i.config.MaxPages {
-		return nil, fmt.Errorf(
-			"page count %d is outside configured limits",
-			pageCount,
+		return store.BookSummary{}, conversionError(
+			"run converter",
+			err,
+			diagnostics.String(),
 		)
 	}
 
-	// Order pages and reject missing numbers.
-	ordered := make([]store.PreparedPage, pageCount)
-	for n := 1; n <= pageCount; n++ {
-		page, ok := pages[n]
-		if !ok {
-			return nil, fmt.Errorf("missing page %d", n)
-		}
-		ordered[n-1] = page
+	var book store.BookSummary
+	decoder := json.NewDecoder(&output)
+	if err := decoder.Decode(&book); err != nil {
+		return book, conversionError("decode result", err, diagnostics.String())
 	}
-
-	return ordered, nil
+	if err := requireEOF(decoder); err != nil {
+		return book, conversionError("decode result", err, diagnostics.String())
+	}
+	return book, nil
 }
 
-func (i *Importer) loadPage(dir, name string) (store.PreparedPage, int64, error) {
-	// Read the page number.
-	match := imageName.FindStringSubmatch(strings.ToLower(name))
-	if match == nil {
-		return store.PreparedPage{}, 0, fmt.Errorf("unexpected staging file %s", name)
+func knownFailure(diagnostics string) (*store.Error, bool) {
+	var failure convertFailure
+	if err := json.Unmarshal([]byte(strings.TrimSpace(diagnostics)), &failure); err != nil {
+		return nil, false
 	}
-
-	pageIndex, err := strconv.Atoi(match[1])
-	if err != nil {
-		return store.PreparedPage{}, 0, fmt.Errorf("invalid page number: %w", err)
+	message := ""
+	switch failure.Code {
+	case store.CodeOutlineRequired:
+		message = "PDF outline is required."
+	case store.CodeOutlineUnusable:
+		message = "PDF outline cannot be stored."
+	default:
+		return nil, false
 	}
-
-	// Read the page image.
-	data, err := os.ReadFile(filepath.Join(dir, name))
-	if err != nil {
-		return store.PreparedPage{}, 0, err
-	}
-
-	// Check the page size.
-	imageBytes := int64(len(data))
-	if imageBytes > i.config.MaxImageBytes {
-		return store.PreparedPage{}, 0, fmt.Errorf("page %d exceeds image size limit", pageIndex)
-	}
-
-	// Verify the image format.
-	mime := http.DetectContentType(data)
-	if mime != "image/jpeg" && mime != "image/png" {
-		return store.PreparedPage{}, 0, fmt.Errorf(
-			"page %d has unsupported type %s",
-			pageIndex,
-			mime,
-		)
-	}
-
-	return store.PreparedPage{
-		PageIndex: pageIndex,
-		MIMEType:  mime,
-		ImageData: data,
-	}, imageBytes, nil
+	return &store.Error{
+		Code:    failure.Code,
+		Message: message,
+	}, true
 }
 
-func loadTOC(path string, pageCount int) ([]store.TOCEntry, error) {
-	// Open the table of contents.
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
+func requireEOF(decoder *json.Decoder) error {
+	var extra any
+	err := decoder.Decode(&extra)
+	if err == io.EOF {
+		return nil
 	}
-	defer file.Close()
-
-	// Read the entire CSV file.
-	reader := csv.NewReader(file)
-
-	// Require the expected column count.
-	reader.FieldsPerRecord = len(tocHeader)
-	rows, err := reader.ReadAll()
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return fmt.Errorf("unexpected trailing JSON")
 	}
-
-	// Require the expected CSV header.
-	rowCount := len(rows)
-	if rowCount == 0 {
-		return nil, fmt.Errorf("toc.csv has zero rows")
-	}
-
-	if !slices.Equal(rows[0], tocHeader[:]) {
-		return nil, fmt.Errorf("toc.csv has an invalid header")
-	}
-
-	// Parse each table of contents row.
-	entries := make([]store.TOCEntry, rowCount-1)
-	for idx, row := range rows[1:] {
-		entry, err := parseTOCRow(row, idx, pageCount)
-		if err != nil {
-			return nil, err
-		}
-
-		entries[idx] = entry
-	}
-
-	return entries, nil
+	return err
 }
 
-func parseTOCRow(row []string, idx, pageCount int) (store.TOCEntry, error) {
-	// Parse the numeric columns.
-	position, positionErr := strconv.Atoi(row[0])
-	depth, depthErr := strconv.Atoi(row[1])
-	page, pageErr := strconv.Atoi(row[3])
-
-	// Validate every field.
-	rowNumber := idx + 2
-	expectedPosition := idx + 1
-	title := strings.TrimSpace(row[2])
-
-	invalidNumber := positionErr != nil || depthErr != nil || pageErr != nil
-	invalidPosition := position != expectedPosition
-	invalidDepth := depth < 0
-	invalidPage := page < 1 || page > pageCount
-	invalidTitle := title == ""
-
-	invalidRow := invalidNumber || invalidPosition || invalidDepth || invalidPage || invalidTitle
-	if invalidRow {
-		return store.TOCEntry{}, fmt.Errorf("invalid TOC row %d", rowNumber)
+func conversionError(reason string, cause error, diagnostics string) *store.Error {
+	details := map[string]any{"reason": reason}
+	if text := strings.TrimSpace(diagnostics); text != "" {
+		details["diagnostics"] = text
 	}
-
-	return store.TOCEntry{
-		Position:  position,
-		Depth:     depth,
-		Title:     title,
-		PageIndex: page,
-	}, nil
+	return &store.Error{
+		Code:    store.CodeConversionFailed,
+		Message: "PDF import failed.",
+		Details: details,
+		Cause:   cause,
+	}
 }

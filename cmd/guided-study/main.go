@@ -66,6 +66,7 @@ func run(args []string) error {
 	// Create the services and HTTP server.
 	imp := importer.New(importer.Config{
 		ConverterPath: cfg.ConverterPath,
+		DatabasePath:  cfg.DatabasePath,
 	})
 	mcpService := mcpserver.New(st, imp, logger)
 	httpServer := localserver.New(cfg.Listen, mcpService.Handler(logger))

@@ -1,6 +1,6 @@
 ---
 name: noggin
-description: Guide active, section-by-section learning from prepared books. Use for starting or resuming guided reading; studying or discussing a chapter, section, page, figure, or table; building understanding through one question at a time; explaining the study method; or creating and revising flashcard decks from a prepared book.
+description: Prepare PDF books and guide active, page-by-page learning with Guided Study. Use for importing a book; starting or resuming guided reading; studying or discussing a chapter, section, page, figure, or table; building understanding through one question at a time; explaining the study method; or creating and revising flashcard decks from a prepared book.
 ---
 
 # Guided study
@@ -11,8 +11,8 @@ selected knowledge for later recall in a separate workflow.
 
 Use the `guided_study` MCP tools as the durable backend. Ground teaching and
 flashcards in the rendered page images. The teaching agent decides questions,
-understanding, section semantics, card value, and card wording. The service
-stores deterministic book, session, page, and deck state.
+understanding, heading semantics, card value, and card wording. The service
+stores deterministic book, session, outline, and deck state.
 
 ## Route the request
 
@@ -20,6 +20,8 @@ Read every reference needed for the learner's request:
 
 - For starting, continuing, or resuming guided study, read
   [guided-reading.md](references/guided-reading.md) in full.
+- For preparing or importing a PDF book, read
+  [book-import.md](references/book-import.md) in full.
 - For creating or managing flashcard decks, read
   [flashcards.md](references/flashcards.md) in full.
 - For help using the system or understanding its design, read

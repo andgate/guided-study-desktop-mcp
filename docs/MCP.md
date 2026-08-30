@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This document is the draft version-one MCP contract for `guided-study-desktop-mcp`. It refines the provisional tool list in `PLAN.md`; no implementation is implied.
+This document defines the MCP contract for `guided-study-desktop-mcp`.
 
 The local Windows application exposes one Streamable HTTP MCP endpoint, initially `/mcp`, from the same Go process that owns the tray application and SQLite connection. ChatGPT connects to the configured address and port. STDIO and non-ChatGPT hosts are outside the version-one contract.
 
@@ -22,13 +22,12 @@ An unsuccessful tool call sets MCP `isError` and returns this structured error s
 
 ```json
 {
-  "code": "cursor_conflict",
-  "message": "Expected page 12, but this cursor is on page 13.",
+  "code": "no_next_batch",
+  "message": "No later page batch exists.",
   "details": {
     "book_id": "…",
     "session_id": "…",
-    "expected_page_index": 12,
-    "actual_page_index": 13
+    "page_index": 42
   }
 }
 ```
@@ -41,10 +40,12 @@ Stable version-one error codes are:
 | `not_found` | The exact book, session, deck, card, revision, or page does not exist. |
 | `already_exists` | A caller-supplied deck ID or case-insensitive session name is already in use within its book. |
 | `out_of_bounds` | A requested page falls below 1 or above the book's page count. |
-| `cursor_conflict` | `expected_page_index` does not equal the effective stored cursor. |
+| `no_next_batch` | No page batch follows the supplied checkpoint. |
 | `deck_revision_conflict` | `expected_revision` does not equal the deck metadata revision. |
 | `card_revision_conflict` | `expected_revision` does not equal the logical card's latest revision. |
-| `conversion_failed` | The converter could not run, returned failure, or produced invalid staging output. |
+| `conversion_failed` | The converter could not run or return a committed book. |
+| `outline_required` | The PDF has no extractable outline. |
+| `outline_unusable` | The extracted PDF outline cannot be stored unchanged. |
 | `storage_error` | SQLite or local storage failed unexpectedly. |
 
 Conflict errors include expected and actual values.
@@ -58,33 +59,15 @@ BookSummary {
   page_count: integer
 }
 
-TocEntry {
-  position: integer
-  depth: integer
-  title: string
-  page_index: integer
-}
-
 Book {
   book_id: string
   title: string
   page_count: integer
-  toc: TocEntry[]
-}
-
-PageMetadata {
-  book_id: string
-  session_id: string
-  session_name: string
-  page_index: integer
-  page_count: integer
-  current_section: string | null
-  toc_context: TocEntry[]
+  outline_csv: string
 }
 
 PageBatchEntry {
   page_index: integer
-  toc_context: TocEntry[]
 }
 
 PageBatch {
@@ -99,8 +82,32 @@ SessionSummary {
   book_id: string
   session_id: string
   name: string
-  page_index: integer
-  current_section: string | null
+  origin_page_index: integer
+  checkpoint_page_index: integer
+  checkpoint_heading: string | null
+}
+
+PageSelection {
+  book_id: string
+  session_id: string
+  batch: {
+    start_page_index: integer
+    end_page_index: integer
+  }
+}
+
+CreatedSession {
+  session: SessionSummary
+  selection: PageSelection
+}
+
+ReadingBatch {
+  book_id: string
+  session_id: string
+  batch: {
+    start_page_index: integer
+    end_page_index: integer
+  }
 }
 
 DeckSummary {
@@ -131,8 +138,6 @@ Deck {
 }
 ```
 
-`toc_context` contains the closest TOC lineage available for the returned page: the latest preceding entry at each applicable depth, followed by entries beginning on that exact page. It is navigation context, not inferred semantic section data.
-
 `source_pages` is canonical CSV such as `"3,4,9"`, not a JSON array. Values are ascending, unique, 1-based, and contain no spaces.
 
 ## Book management tools
@@ -146,7 +151,11 @@ file_reference: string
 title: string
 ```
 
-The caller supplies the book's absolute local path and nonblank display title. The server passes the path to the PDF converter, validates all staged pages and TOC rows, and commits the entire book in one SQLite transaction. The service generates `book_id` and does not derive or replace the supplied title.
+The caller supplies the absolute local PDF path and nonblank display title. The
+converter extracts the PDF outline, renders every page, and inserts the complete
+book in one SQLite transaction. A missing outline returns `outline_required`.
+An extracted outline that cannot be stored unchanged returns
+`outline_unusable`.
 
 Result: `BookSummary`.
 
@@ -168,7 +177,15 @@ Books are sorted case-insensitively by title and then by `book_id`. Read-only.
 
 Input: `book_id: string`.
 
-Result: `Book`, with TOC entries ordered by `position`.
+Result: `Book`. `outline_csv` begins with:
+
+```csv
+outline_index,title,page_index
+```
+
+Remaining RFC 4180 rows appear in extraction order. The outline helps callers
+locate headings and pages. It does not define page ownership, teaching bounds,
+or checkpoint identity.
 
 This tool never returns page images, source PDF data, or extracted page text. Read-only.
 
@@ -210,20 +227,20 @@ end_page_index: integer
 The range is inclusive and may have any valid size. The start must not exceed
 the end, and both indices must fall within the book.
 
-Result: `PageBatch` in `structuredContent`. Each page entry has matching TOC
-context. The MCP content contains `Page N.` before each rendered image, with
-entries, labels, and images in ascending order.
+Result: `PageBatch` in `structuredContent`. The MCP content contains `Page N.`
+before each rendered image, with entries, labels, and images in ascending order.
 
 This tool is read-only. It does not require or access a study session, and it
 does not move any session cursor.
 
 ## Progressive reading tools
 
-A study session is a durable, named reading thread for exactly one book. It is not tied to the MCP connection or to one ChatGPT conversation. Any later agent can resume it by supplying its stable `session_id`.
+A study session is a durable, named reading thread for exactly one book. Any
+later agent can resume it with its stable `session_id`.
 
-There is no implicit or globally active session. After choosing a book, a new chat calls `list_sessions`, resumes an obvious session, asks the user when the choice is ambiguous, or creates a new one. Every session reading tool requires an existing session belonging to the supplied book.
-
-Session page tools produce `PageMetadata` in `structuredContent` and one rendered MCP image block.
+There is no globally active session. Except for `create_session`, every
+progressive-reading tool requires an existing session belonging to the supplied
+book.
 
 ### `create_session`
 
@@ -232,11 +249,16 @@ Input:
 ```text
 book_id: string
 name: string
+start_page_index: integer
 ```
 
-The server trims the name, requires it to be unique within the book under case-insensitive comparison, generates `session_id`, and initializes the cursor to page 1 with no current section.
+The server trims the name, requires case-insensitive uniqueness within the book,
+and generates `session_id`. The start page must exist in the book. It becomes
+the batch origin and physical checkpoint. The checkpoint heading starts as
+`null`. The response includes the consecutive batch beginning at the chosen
+page and rendered images.
 
-Result: `SessionSummary`.
+Result: `CreatedSession` plus labeled MCP image blocks.
 
 ### `list_sessions`
 
@@ -254,7 +276,7 @@ session_id: string
 new_name: string
 ```
 
-The new name must remain unique within the book. The stable ID, cursor, and section are unchanged.
+The new name must remain unique within the book. Progress is unchanged.
 
 Result: updated `SessionSummary`.
 
@@ -267,36 +289,10 @@ book_id: string
 session_id: string
 ```
 
-This immediately hard-deletes the exact session and its cursor. It does not delete the book, decks, or cards.
+This hard-deletes the exact session and its progress. It does not delete the
+book, decks, or cards.
 
 Result: `{ book_id: string, session_id: string, deleted: true }`. Destructive.
-
-### `current_page`
-
-Input:
-
-```text
-book_id: string
-session_id: string
-```
-
-Result: current page image plus `PageMetadata`. Does not move the cursor. Read-only.
-
-### `next_page`
-
-Input:
-
-```text
-book_id: string
-session_id: string
-expected_page_index: integer
-```
-
-The server checks the stored session page, rejects a mismatch, rejects advancing past `page_count`, moves exactly one page, and returns the new page image plus `PageMetadata`.
-
-### `prev_page`
-
-Input is the same as `next_page`. It rejects moving before page 1, moves exactly one page, and returns the resulting page image plus `PageMetadata`.
 
 ### `goto_page`
 
@@ -305,25 +301,68 @@ Input:
 ```text
 book_id: string
 session_id: string
-target_page_index: integer
-expected_page_index: integer
+page_index: integer
 ```
 
-The server checks the current cursor and target bounds, then stores the target and returns its image plus `PageMetadata`. Going to the already-current page succeeds without creating a second kind of cursor revision.
+The page must belong to the supplied book. The call makes it the new batch
+origin, resets the physical checkpoint to that page, and clears the checkpoint
+heading. It returns the consecutive batch beginning at the chosen page.
 
-### `set_current_section`
+Result: `PageSelection` plus labeled MCP image blocks.
+
+### `continue_reading`
 
 Input:
 
 ```text
 book_id: string
 session_id: string
-section: string | null
+page_index: integer
+heading: string
 ```
 
-The text is supplied by the agent and is not inferred or validated against the TOC. `null` clears it. Repeating the same value is idempotent.
+The physical page and nonblank heading form the learner checkpoint. The heading
+is supplied by the agent from the rendered page; the service does not derive or
+validate it against the PDF outline.
 
-Result: `SessionSummary`.
+The call finds the fixed batch containing the checkpoint, then returns the
+following consecutive batch. Batches contain at most five pages and align to
+the session's stored origin.
+
+```text
+batch_start = origin + floor((checkpoint - origin) / 5) * 5
+batch_end = min(batch_start + 4, page_count)
+next_batch_start = batch_start + 5
+next_batch_end = min(next_batch_start + 4, page_count)
+```
+
+The teaching agent preloads before its first question sourced from the current
+batch's midpoint page. The trigger is
+`batch_start + floor(batch_size / 2)`, where
+`batch_size = batch_end - batch_start + 1`.
+
+The checkpoint is saved atomically with successful page loading. The service
+stores no delivered-page window. When no later batch exists, `no_next_batch` is
+returned and the supplied checkpoint is not saved.
+
+Result: `ReadingBatch` plus labeled MCP image blocks.
+
+### `save_checkpoint`
+
+Input:
+
+```text
+book_id: string
+session_id: string
+page_index: integer
+heading: string
+```
+
+The call saves the physical page and nonblank agent-supplied heading without
+loading pages. The page must fall between the session origin and the final
+physical page.
+
+Result: updated `SessionSummary`.
 
 ## Deck tools
 

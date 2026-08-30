@@ -2,7 +2,10 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/andgate/guided-study-desktop-mcp/internal/store"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -26,6 +29,17 @@ type booksOutput struct {
 	Books []store.BookSummary `json:"books"`
 }
 
+type bookOutput struct {
+	store.BookSummary
+	OutlineCSV string `json:"outline_csv"`
+}
+
+var outlineHeader = []string{
+	"outline_index",
+	"title",
+	"page_index",
+}
+
 func (s *Service) registerBookTools() {
 	// Register book import and listing tools.
 	addTool(
@@ -33,15 +47,11 @@ func (s *Service) registerBookTools() {
 		&mcp.Tool{
 			Name:        "import_book",
 			Title:       "Import book",
-			Description: "Prepare a PDF into rendered page images and an ordered table of contents, then store the complete book transactionally.",
+			Description: "Import a PDF and extract its outline.",
 			Annotations: toolAnnotations("Import book", false, false),
 		},
 		func(ctx context.Context, in importBookInput) (store.BookSummary, string, error) {
-			prepared, err := s.importer.Prepare(ctx, in.FileReference, in.Title)
-			if err != nil {
-				return store.BookSummary{}, "", err
-			}
-			book, err := s.store.ImportPreparedBook(ctx, prepared)
+			book, err := s.importer.Import(ctx, in.FileReference, in.Title)
 			return book, fmt.Sprintf("Imported %q with %d pages.", book.Title, book.PageCount), err
 		},
 	)
@@ -51,7 +61,7 @@ func (s *Service) registerBookTools() {
 		&mcp.Tool{
 			Name:        "list_books",
 			Title:       "List books",
-			Description: "List prepared books so the user can choose one by stable ID.",
+			Description: "List books with stable IDs.",
 			Annotations: toolAnnotations("List books", true, false),
 		},
 		func(ctx context.Context, _ emptyInput) (booksOutput, string, error) {
@@ -65,12 +75,19 @@ func (s *Service) registerBookTools() {
 		&mcp.Tool{
 			Name:        "get_book",
 			Title:       "Get book",
-			Description: "Read book metadata and its ordered table of contents without page content.",
+			Description: "Read book metadata and its outline.",
 			Annotations: toolAnnotations("Get book", true, false),
 		},
-		func(ctx context.Context, in bookIDInput) (store.Book, string, error) {
+		func(ctx context.Context, in bookIDInput) (bookOutput, string, error) {
 			book, err := s.store.GetBook(ctx, in.BookID)
-			return book, fmt.Sprintf("Loaded metadata for %q.", book.Title), err
+			if err != nil {
+				return bookOutput{}, "", err
+			}
+			outline, err := outlineCSV(book.Outline)
+			return bookOutput{
+				BookSummary: book.BookSummary,
+				OutlineCSV:  outline,
+			}, fmt.Sprintf("Loaded metadata for %q.", book.Title), err
 		},
 	)
 
@@ -80,7 +97,7 @@ func (s *Service) registerBookTools() {
 		&mcp.Tool{
 			Name:        "rename_book",
 			Title:       "Rename book",
-			Description: "Change a book's display title without changing its stable ID.",
+			Description: "Rename a book.",
 			Annotations: toolAnnotations("Rename book", false, false),
 		},
 		func(ctx context.Context, in renameBookInput) (store.BookSummary, string, error) {
@@ -94,7 +111,7 @@ func (s *Service) registerBookTools() {
 		&mcp.Tool{
 			Name:        "remove_book",
 			Title:       "Remove book",
-			Description: "Permanently delete the exact book and all sessions, logs, decks, cards, and rendered pages it owns. The source PDF is never touched.",
+			Description: "Delete a book and its study data.",
 			Annotations: toolAnnotations("Remove book", false, true),
 		},
 		func(ctx context.Context, in bookIDInput) (deletedBook, string, error) {
@@ -102,7 +119,29 @@ func (s *Service) registerBookTools() {
 			return deletedBook{
 				BookID:  in.BookID,
 				Deleted: err == nil,
-			}, "Deleted the book and its canonical study data.", err
+			}, "Deleted the book and its study data.", err
 		},
 	)
+}
+
+func outlineCSV(outline []store.OutlineEntry) (string, error) {
+	var output strings.Builder
+	writer := csv.NewWriter(&output)
+	writer.UseCRLF = true
+
+	if err := writer.Write(outlineHeader); err != nil {
+		return "", err
+	}
+	for _, entry := range outline {
+		row := []string{
+			strconv.Itoa(entry.OutlineIndex),
+			entry.Title,
+			strconv.Itoa(entry.PageIndex),
+		}
+		if err := writer.Write(row); err != nil {
+			return "", err
+		}
+	}
+	writer.Flush()
+	return output.String(), writer.Error()
 }
