@@ -128,17 +128,17 @@ In ChatGPT, enable developer mode, create an app, choose **Tunnel**, and select 
 
 The tunnel admin UI is available at `http://127.0.0.1:8080/ui` while the client runs.
 
-## Install Noggin locally
+## Package Noggin
 
-Connecting the MCP server exposes storage and navigation tools, but it does not install the teaching workflow. Install or refresh Noggin for the current Windows user with:
+Create a standalone Noggin skill archive with:
 
 ```powershell
-task plugin:install
+task skill:zip
 ```
 
-The task runs `python scripts/install_plugin.py` in the global Python environment. It validates the skill from `noggin-plugin` and installs it at `%USERPROFILE%\.agents\skills\noggin`, making it available outside this repository. The installer does not require the Codex CLI.
+The task writes `dist\noggin.zip`. Its root contains `SKILL.md`, `agents`, and `references`, ready for skill upload.
 
-Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable HTTP server named `guided_study` with URL `http://127.0.0.1:7331/mcp`. Start a new conversation after installing or refreshing the plugin so the client discovers the updated skill.
+Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable HTTP server named `guided_study` with URL `http://127.0.0.1:7331/mcp`.
 
 ## Data and recovery
 

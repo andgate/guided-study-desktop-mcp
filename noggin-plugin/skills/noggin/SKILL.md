@@ -14,6 +14,13 @@ flashcards in the rendered page images. The teaching agent decides questions,
 understanding, heading semantics, card value, and card wording. The service
 stores deterministic book, session, outline, and deck state.
 
+## MCP server guidelines
+
+The server keeps no active book or session. Supply the exact stored IDs each
+tool requires; never substitute a title or name for an ID.
+
+All page indices are 1-based physical PDF pages.
+
 ## Route the request
 
 Read every reference needed for the learner's request:

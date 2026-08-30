@@ -18,14 +18,22 @@ tasks:
     desc: Remove temporary files, build artifacts, and the Go build cache
     platforms: [windows]
     cmds:
-      - powershell -NoProfile -Command '$root = (Get-Location).Path; foreach ($name in @("bin", ".cache")) { $target = [IO.Path]::GetFullPath((Join-Path $root $name)); if ([IO.Path]::GetDirectoryName($target) -ne $root) { throw "Unsafe clean target $target" }; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force } }'
+      - powershell -NoProfile -Command '$root = (Get-Location).Path; foreach ($name in @("bin", "dist", ".cache")) { $target = [IO.Path]::GetFullPath((Join-Path $root $name)); if ([IO.Path]::GetDirectoryName($target) -ne $root) { throw "Unsafe clean target $target" }; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force } }'
       - go clean
 
-  plugin:install:
-    desc: Install or refresh Noggin for the current user
+  skill:zip:
+    desc: Zip Noggin for skill upload
     platforms: [windows]
+    vars:
+      SOURCE: noggin-plugin/skills/noggin
+      ARCHIVE: dist/noggin.zip
     cmds:
-      - python scripts/install_plugin.py
+      - >-
+        powershell -NoProfile -Command
+        '$skill = (Resolve-Path -LiteralPath "{{.SOURCE}}").Path;
+        $archive = [IO.Path]::GetFullPath("{{.ARCHIVE}}");
+        New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($archive)) -Force | Out-Null;
+        Compress-Archive -Path (Join-Path $skill "*") -DestinationPath $archive -Force'
 
   tunnel:init:
     desc: Create the tunnel profile

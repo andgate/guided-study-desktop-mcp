@@ -2,7 +2,6 @@ package mcpserver
 
 import (
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,9 +12,6 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
-
-//go:embed instructions.md
-var instructions string
 
 type Service struct {
 	store    *store.Store
@@ -29,8 +25,7 @@ func New(st *store.Store, imp *importer.Importer, logger *slog.Logger) *Service 
 	svc.server = mcp.NewServer(
 		&mcp.Implementation{Name: "guided-study", Version: "1.0.0"},
 		&mcp.ServerOptions{
-			Instructions: instructions,
-			Logger:       logger,
+			Logger: logger,
 		},
 	)
 

@@ -3,6 +3,7 @@
 /.task/
 /converter/.venv/
 /bin/
+/dist/
 /.env.local
 /*.db
 /*.db-shm
