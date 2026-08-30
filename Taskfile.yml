@@ -1,5 +1,10 @@
 version: '3'
 
+vars:
+  MCP_SERVER_URL: http://127.0.0.1:7331/mcp
+  TUNNEL_CLIENT: '{{.LOCALAPPDATA}}\Programs\tunnel-client\tunnel-client.exe'
+  TUNNEL_PROFILE: guided-study
+
 tasks:
   build:
     desc: Build the Windows desktop application and bundled PDF converter
@@ -21,6 +26,55 @@ tasks:
     platforms: [windows]
     cmds:
       - python scripts/install_plugin.py
+
+  tunnel:init:
+    desc: Create the tunnel profile
+    platforms: [windows]
+    dotenv: ['.env.local']
+    preconditions:
+      - sh: powershell -NoProfile -Command 'if (-not (Test-Path -LiteralPath "{{.TUNNEL_CLIENT}}")) { exit 1 }'
+        msg: Install tunnel-client for this user.
+      - sh: powershell -NoProfile -Command 'if ([string]::IsNullOrWhiteSpace($env:CONTROL_PLANE_TUNNEL_ID)) { exit 1 }'
+        msg: Set CONTROL_PLANE_TUNNEL_ID in .env.local.
+    cmds:
+      - >-
+        powershell -NoProfile -Command
+        '& "{{.TUNNEL_CLIENT}}" init
+        --sample sample_mcp_remote_no_auth
+        --profile "{{.TUNNEL_PROFILE}}"
+        --tunnel-id $env:CONTROL_PLANE_TUNNEL_ID
+        --mcp-server-url "{{.MCP_SERVER_URL}}"'
+
+  tunnel:doctor:
+    desc: Check the tunnel profile
+    platforms: [windows]
+    dotenv: ['.env.local']
+    preconditions:
+      - sh: powershell -NoProfile -Command 'if (-not (Test-Path -LiteralPath "{{.TUNNEL_CLIENT}}")) { exit 1 }'
+        msg: Install tunnel-client for this user.
+      - sh: powershell -NoProfile -Command 'if ([string]::IsNullOrWhiteSpace($env:CONTROL_PLANE_API_KEY)) { exit 1 }'
+        msg: Set CONTROL_PLANE_API_KEY in .env.local.
+    cmds:
+      - >-
+        powershell -NoProfile -Command
+        '& "{{.TUNNEL_CLIENT}}" doctor
+        --profile "{{.TUNNEL_PROFILE}}"
+        --explain'
+
+  tunnel:run:
+    desc: Run the private MCP tunnel
+    platforms: [windows]
+    dotenv: ['.env.local']
+    preconditions:
+      - sh: powershell -NoProfile -Command 'if (-not (Test-Path -LiteralPath "{{.TUNNEL_CLIENT}}")) { exit 1 }'
+        msg: Install tunnel-client for this user.
+      - sh: powershell -NoProfile -Command 'if ([string]::IsNullOrWhiteSpace($env:CONTROL_PLANE_API_KEY)) { exit 1 }'
+        msg: Set CONTROL_PLANE_API_KEY in .env.local.
+    cmds:
+      - >-
+        powershell -NoProfile -Command
+        '& "{{.TUNNEL_CLIENT}}" run
+        --profile "{{.TUNNEL_PROFILE}}"'
 
   test:
     desc: Run the Go and Python tests

@@ -93,6 +93,41 @@ The health probe is `GET /healthz`.
 
 The `import_book.file_reference` input is the absolute path to the local PDF supplied by the host.
 
+## Connect ChatGPT on the web
+
+Use OpenAI's Secure MCP Tunnel to reach the local server without exposing a public endpoint. Copy the local environment template:
+
+```powershell
+Copy-Item .env.local.example .env.local
+```
+
+Create a tunnel in [Platform tunnel settings](https://platform.openai.com/settings/organization/tunnels). Add its ID to `CONTROL_PLANE_TUNNEL_ID` in `.env.local`.
+
+Create a runtime key in [Platform API keys](https://platform.openai.com/settings/organization/api-keys). The key principal needs Tunnels Read + Use. Add the key to `CONTROL_PLANE_API_KEY` in `.env.local`. Do not use an admin key.
+
+Create the local profile once:
+
+```powershell
+task tunnel:init
+```
+
+Start the application in one terminal:
+
+```powershell
+.\bin\guided-study.exe
+```
+
+Check and run the tunnel in another terminal:
+
+```powershell
+task tunnel:doctor
+task tunnel:run
+```
+
+In ChatGPT, enable developer mode, create an app, choose **Tunnel**, and select the tunnel. The tunnel must include the target ChatGPT workspace association.
+
+The tunnel admin UI is available at `http://127.0.0.1:8080/ui` while the client runs.
+
 ## Install Noggin locally
 
 Connecting the MCP server exposes storage and navigation tools, but it does not install the teaching workflow. Install or refresh Noggin for the current Windows user with:
