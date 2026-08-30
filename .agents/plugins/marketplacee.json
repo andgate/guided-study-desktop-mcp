@@ -1,0 +1,20 @@
+{
+  "name": "andgate-dev",
+  "interface": {
+    "displayName": "andgate development"
+  },
+  "plugins": [
+    {
+      "name": "noggin",
+      "source": {
+        "source": "local",
+        "path": "./noggin-plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Education"
+    }
+  ]
+}

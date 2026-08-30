@@ -1,0 +1,22 @@
+{
+  "name": "noggin",
+  "version": "0.1.0",
+  "description": "Active guided study and flashcard workflows for prepared books.",
+  "repository": "https://github.com/andgate/guided-study-desktop-mcp",
+  "skills": "./skills/",
+  "apps": "./.app.json",
+  "interface": {
+    "displayName": "Noggin",
+    "shortDescription": "Study books actively or create flashcard decks",
+    "longDescription": "Guided, page-by-page study of prepared books with persistent progress and flashcard workflows.",
+    "developerName": "andgate",
+    "category": "Education",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Continue my active guided study session."
+    ]
+  }
+}
