@@ -1,10 +1,5 @@
 version: '3'
 
-vars:
-  MCP_SERVER_URL: http://127.0.0.1:7331/mcp
-  TUNNEL_CLIENT: '{{.LOCALAPPDATA}}\Programs\tunnel-client\tunnel-client.exe'
-  TUNNEL_PROFILE: guided-study
-
 tasks:
   build:
     desc: Build the Windows desktop application and bundled PDF converter
@@ -18,71 +13,14 @@ tasks:
     desc: Remove temporary files, build artifacts, and the Go build cache
     platforms: [windows]
     cmds:
-      - powershell -NoProfile -Command '$root = (Get-Location).Path; foreach ($name in @("bin", "dist", ".cache")) { $target = [IO.Path]::GetFullPath((Join-Path $root $name)); if ([IO.Path]::GetDirectoryName($target) -ne $root) { throw "Unsafe clean target $target" }; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force } }'
+      - powershell -NoProfile -Command '$root = (Get-Location).Path; foreach ($name in @("bin", ".cache")) { $target = [IO.Path]::GetFullPath((Join-Path $root $name)); if ([IO.Path]::GetDirectoryName($target) -ne $root) { throw "Unsafe clean target $target" }; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force } }'
       - go clean
 
-  skill:zip:
-    desc: Zip Noggin for skill upload
+  plugin:install:
+    desc: Install or refresh Noggin for the current user
     platforms: [windows]
-    vars:
-      SOURCE: noggin-plugin/skills/noggin
-      ARCHIVE: dist/noggin.zip
     cmds:
-      - >-
-        powershell -NoProfile -Command
-        '$skill = (Resolve-Path -LiteralPath "{{.SOURCE}}").Path;
-        $archive = [IO.Path]::GetFullPath("{{.ARCHIVE}}");
-        New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($archive)) -Force | Out-Null;
-        Compress-Archive -Path (Join-Path $skill "*") -DestinationPath $archive -Force'
-
-  tunnel:init:
-    desc: Create the tunnel profile
-    platforms: [windows]
-    dotenv: ['.env.local']
-    preconditions:
-      - sh: powershell -NoProfile -Command 'if (-not (Test-Path -LiteralPath "{{.TUNNEL_CLIENT}}")) { exit 1 }'
-        msg: Install tunnel-client for this user.
-      - sh: powershell -NoProfile -Command 'if ([string]::IsNullOrWhiteSpace($env:CONTROL_PLANE_TUNNEL_ID)) { exit 1 }'
-        msg: Set CONTROL_PLANE_TUNNEL_ID in .env.local.
-    cmds:
-      - >-
-        powershell -NoProfile -Command
-        '& "{{.TUNNEL_CLIENT}}" init
-        --sample sample_mcp_remote_no_auth
-        --profile "{{.TUNNEL_PROFILE}}"
-        --tunnel-id $env:CONTROL_PLANE_TUNNEL_ID
-        --mcp-server-url "{{.MCP_SERVER_URL}}"'
-
-  tunnel:doctor:
-    desc: Check the tunnel profile
-    platforms: [windows]
-    dotenv: ['.env.local']
-    preconditions:
-      - sh: powershell -NoProfile -Command 'if (-not (Test-Path -LiteralPath "{{.TUNNEL_CLIENT}}")) { exit 1 }'
-        msg: Install tunnel-client for this user.
-      - sh: powershell -NoProfile -Command 'if ([string]::IsNullOrWhiteSpace($env:CONTROL_PLANE_API_KEY)) { exit 1 }'
-        msg: Set CONTROL_PLANE_API_KEY in .env.local.
-    cmds:
-      - >-
-        powershell -NoProfile -Command
-        '& "{{.TUNNEL_CLIENT}}" doctor
-        --profile "{{.TUNNEL_PROFILE}}"
-        --explain'
-
-  tunnel:run:
-    desc: Run the private MCP tunnel
-    platforms: [windows]
-    dotenv: ['.env.local']
-    preconditions:
-      - sh: powershell -NoProfile -Command 'if (-not (Test-Path -LiteralPath "{{.TUNNEL_CLIENT}}")) { exit 1 }'
-        msg: Install tunnel-client for this user.
-      - sh: powershell -NoProfile -Command 'if ([string]::IsNullOrWhiteSpace($env:CONTROL_PLANE_API_KEY)) { exit 1 }'
-        msg: Set CONTROL_PLANE_API_KEY in .env.local.
-    cmds:
-      - >-
-        powershell -NoProfile -Command
-        '& "{{.TUNNEL_CLIENT}}" run
-        --profile "{{.TUNNEL_PROFILE}}"'
+      - python scripts/install_skill.py
 
   test:
     desc: Run the Go and Python tests
