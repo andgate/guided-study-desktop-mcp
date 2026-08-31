@@ -1,6 +1,6 @@
 # Guided Study Desktop MCP
 
-<img src="cmd/guided-study/assets/tray-icon.png" alt="Guided Study open-book tray icon" width="96">
+<img src="cmd/noggin-mcp/assets/tray-icon.png" alt="Guided Study open-book tray icon" width="96">
 
 Guided Study is a local Windows application that gives an LLM deterministic tools for preparing books, navigating rendered pages, persisting independent study sessions, and maintaining revisioned flashcard decks. The LLM teaches; this service owns storage and page delivery.
 
@@ -39,17 +39,17 @@ git lfs pull
 
 ```powershell
 task build
-.\bin\guided-study.exe
+.\bin\noggin-mcp.exe
 ```
 
-The build produces `bin\guided-study.exe` and `bin\pdf-converter.exe`. Keep them together when distributing the application.
+The build produces `bin\noggin-mcp.exe` and `bin\pdf-converter.exe`. Keep them together when distributing the application.
 
 The status window may be closed without stopping the server. Reopen it from the tray. Choose **Quit** from the tray for graceful HTTP and SQLite shutdown.
 
 For terminal-only development:
 
 ```powershell
-.\bin\guided-study.exe --headless
+.\bin\noggin-mcp.exe --headless
 ```
 
 Useful options:
@@ -103,7 +103,7 @@ task plugin:install
 
 The task copies `noggin-plugin\skills\noggin` to `%USERPROFILE%\.agents\skills\noggin`.
 
-Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable HTTP server named `guided_study` with URL `http://127.0.0.1:7331/mcp`.
+Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable HTTP server named `noggin_mcp` with URL `http://127.0.0.1:7331/mcp`.
 
 ## Data and recovery
 

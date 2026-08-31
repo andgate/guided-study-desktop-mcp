@@ -9,7 +9,7 @@ Guide learners attentively through prepared books. Guided reading uses
 purposeful questions and discussion to build understanding. Flashcards preserve
 selected knowledge for later recall in a separate workflow.
 
-Use the `guided_study` MCP tools as the durable backend. Ground teaching and
+Use the `noggin_mcp` MCP tools as the durable backend. Ground teaching and
 flashcards in the rendered page images. The teaching agent decides questions,
 understanding, heading semantics, card value, and card wording. The service
 stores deterministic book, session, outline, and deck state.

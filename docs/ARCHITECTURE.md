@@ -2,7 +2,7 @@
 
 ## Runtime
 
-`cmd/guided-study` owns the process lifecycle. It opens SQLite, constructs the importer and MCP service, starts one `net/http` server, then runs either the Fyne tray loop or a headless signal loop. Tray Quit cancels the process context, shuts down HTTP with a deadline, and closes SQLite.
+`cmd/noggin-mcp` owns the process lifecycle. It opens SQLite, constructs the importer and MCP service, starts one `net/http` server, then runs either the Fyne tray loop or a headless signal loop. Tray Quit cancels the process context, shuts down HTTP with a deadline, and closes SQLite.
 
 ```text
 ChatGPT / MCP client

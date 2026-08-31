@@ -28,12 +28,17 @@ import (
 //go:embed assets/tray-icon.png
 var trayIconBytes []byte
 
+const (
+	appName     = "Noggin MCP"
+	serviceName = appName + " service"
+)
+
 var trayIconResource = fyne.NewStaticResource("guided-study-tray.png", trayIconBytes)
 
 // main logs startup failures.
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		slog.Error("guided-study stopped", "error", err)
+		slog.Error("noggin-mcp stopped", "error", err)
 		os.Exit(1)
 	}
 }
@@ -159,7 +164,7 @@ func runDesktop(
 
 // newStatusWindow creates the status window.
 func newStatusWindow(a fyne.App, cfg appconfig.Config) (fyne.Window, *widget.Label, string) {
-	window := a.NewWindow("Guided Study")
+	window := a.NewWindow(appName)
 	endpoint := "http://" + cfg.Listen + "/mcp"
 
 	// Create the status fields.
@@ -183,7 +188,7 @@ func newStatusWindow(a fyne.App, cfg appconfig.Config) (fyne.Window, *widget.Lab
 		widget.NewFormItem("Database", databaseEntry),
 	)
 	content := container.NewVBox(
-		widget.NewLabel("Guided Study MCP service"),
+		widget.NewLabel(serviceName),
 		status,
 		connectionForm,
 		copyButton,
@@ -207,7 +212,7 @@ func configureSystemTray(a fyne.App, window fyne.Window, endpoint string, quit f
 	}
 
 	menu := fyne.NewMenu(
-		"Guided Study",
+		appName,
 		fyne.NewMenuItem("Show status", window.Show),
 		fyne.NewMenuItem("Copy MCP endpoint", func() {
 			a.Clipboard().SetContent(endpoint)

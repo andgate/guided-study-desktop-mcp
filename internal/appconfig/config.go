@@ -32,7 +32,7 @@ func Parse(args []string) (Config, error) {
 		return Config{}, err
 	}
 
-	set := flag.NewFlagSet("guided-study", flag.ContinueOnError)
+	set := flag.NewFlagSet("noggin-mcp", flag.ContinueOnError)
 
 	// Flags override the default values in cfg.
 	set.StringVar(&cfg.Listen, "listen", cfg.Listen, "HTTP listen address")
