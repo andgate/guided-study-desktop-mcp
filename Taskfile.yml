@@ -1,26 +1,34 @@
 version: '3'
 
+vars:
+  # Windows executables need a suffix and a GUI subsystem flag.
+  EXE_SUFFIX: '{{if eq OS "windows"}}.exe{{end}}'
+  GUI_LDFLAGS: '{{if eq OS "windows"}}-H=windowsgui {{end}}'
+  PYTHON: '{{if eq OS "windows"}}python{{else}}python3{{end}}'
+
 tasks:
   build:
-    desc: Build the Windows desktop application and bundled PDF converter
-    platforms: [windows]
+    desc: Build the desktop application and bundled PDF converter
     cmds:
       - mkdir -p bin
       - uv run --project converter --locked pyinstaller --noconfirm --clean --onefile --distpath bin --workpath .cache/pyinstaller --specpath .cache/pyinstaller --name pdf-converter converter/prepare_book.py
-      - go build -v -trimpath -ldflags="-H=windowsgui -s -w" -o bin/noggin-mcp.exe ./cmd/noggin-mcp
+      - go build -v -trimpath -ldflags="{{.GUI_LDFLAGS}}-s -w" -o bin/noggin-mcp{{.EXE_SUFFIX}} ./cmd/noggin-mcp
+      - cmd: bash scripts/bundle_macos.sh
+        platforms: [darwin]
 
   clean:
     desc: Remove temporary files, build artifacts, and the Go build cache
-    platforms: [windows]
     cmds:
-      - powershell -NoProfile -Command '$root = (Get-Location).Path; foreach ($name in @("bin", ".cache")) { $target = [IO.Path]::GetFullPath((Join-Path $root $name)); if ([IO.Path]::GetDirectoryName($target) -ne $root) { throw "Unsafe clean target $target" }; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force } }'
+      - cmd: powershell -NoProfile -Command '$root = (Get-Location).Path; foreach ($name in @("bin", ".cache")) { $target = [IO.Path]::GetFullPath((Join-Path $root $name)); if ([IO.Path]::GetDirectoryName($target) -ne $root) { throw "Unsafe clean target $target" }; if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force } }'
+        platforms: [windows]
+      - cmd: rm -rf bin .cache
+        platforms: [darwin, linux]
       - go clean
 
   plugin:install:
     desc: Install or refresh Noggin for the current user
-    platforms: [windows]
     cmds:
-      - python scripts/install_skill.py
+      - '{{.PYTHON}} scripts/install_skill.py'
 
   test:
     desc: Run the Go and Python tests
@@ -37,5 +45,8 @@ tasks:
   format:check:
     desc: Check Go and Python formatting without changing files
     cmds:
-      - powershell -NoProfile -Command '$unformatted = gofmt -l (Get-ChildItem cmd,internal -Recurse -Filter *.go).FullName; if ($unformatted) { $unformatted; exit 1 }'
+      - cmd: powershell -NoProfile -Command '$unformatted = gofmt -l (Get-ChildItem cmd,internal -Recurse -Filter *.go).FullName; if ($unformatted) { $unformatted; exit 1 }'
+        platforms: [windows]
+      - cmd: unformatted="$(gofmt -l cmd internal)"; if [ -n "$unformatted" ]; then echo "$unformatted"; exit 1; fi
+        platforms: [darwin, linux]
       - uv run --project converter --locked ruff format --check converter

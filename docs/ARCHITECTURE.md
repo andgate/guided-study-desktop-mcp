@@ -27,7 +27,7 @@ import. No page-image or CSV staging files are created.
 - `internal/importer`: converter request encoding, subprocess execution, diagnostics, and result decoding.
 - `internal/store`: DDL, domain models, runtime transactions, and canonical study-data access.
 - `internal/mcpserver`: typed tool schemas, descriptions, annotations, structured results/errors, and image content.
-- `converter`: the transactional PDF import writer, frozen as `pdf-converter.exe`.
+- `converter`: the transactional PDF import writer, frozen as `pdf-converter`.
 - `noggin-plugin`: the Noggin workflow that consumes the MCP API.
 
 ## State boundaries

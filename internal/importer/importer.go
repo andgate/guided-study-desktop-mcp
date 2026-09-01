@@ -8,7 +8,6 @@ import (
 	"io"
 	"os/exec"
 	"strings"
-	"syscall"
 
 	"github.com/andgate/guided-study-desktop-mcp/internal/store"
 )
@@ -98,7 +97,7 @@ func (i *Importer) Import(
 	cmd.Stdin = &input
 	cmd.Stdout = &output
 	cmd.Stderr = &diagnostics
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	hideConsole(cmd)
 
 	if err := cmd.Run(); err != nil {
 		if failure, ok := knownFailure(diagnostics.String()); ok {
