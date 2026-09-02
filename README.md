@@ -9,11 +9,11 @@ The version-one contract is implemented as:
 - one Go/Fyne system-tray application;
 - a Streamable HTTP MCP endpoint at `http://127.0.0.1:7331/mcp`;
 - one canonical SQLite database in the current user's data directory;
-- a bundled converter executable that imports PDFs transactionally through PyMuPDF and SQLite;
+- a bundled converter executable that imports PDF and EPUB books transactionally through PyMuPDF and SQLite;
 - 25 focused MCP tools covering books, reading sessions, decks, and immutable card revisions;
 - the MCP-native Noggin skill in [`noggin-plugin`](noggin-plugin/SKILL.md).
 
-The source PDF is never modified, deleted, or retained in SQLite. Failed
+The source book is never modified, deleted, or retained in SQLite. Failed
 rendering or insertion cannot expose a partial book.
 
 ## Prerequisites
@@ -110,7 +110,11 @@ http://127.0.0.1:7331/mcp
 
 The health probe is `GET /healthz`.
 
-The `import_book.file_reference` input is the absolute path to the local PDF supplied by the host.
+The `import_book.file_reference` input is the absolute path to the local PDF or EPUB supplied by the host.
+
+EPUB is reflowable, so its pages are produced by laying the book out at a fixed
+page size. Those page numbers belong to this library and do not match a printed
+edition. Navigate reflowable books by heading.
 
 ## Install Noggin locally
 
@@ -126,12 +130,12 @@ Configure the MCP server separately in ChatGPT Desktop or Codex as a Streamable 
 
 ## Data and recovery
 
-SQLite contains book metadata, PDF outlines, rendered page BLOBs, durable
+SQLite contains book metadata, extracted outlines, rendered page BLOBs, durable
 session progress, deck metadata, and immutable card revisions. The database
 lives under `%LOCALAPPDATA%\GuidedStudy` on Windows and
 `~/Library/Application Support/GuidedStudy` on macOS. Use any SQLite viewer for
 inspection. Explicit exports are not part of version one.
 
-Deleting a session, card, deck, or book is immediate and permanent. Destructive MCP annotations accurately mark those operations. Deleting an imported book never touches its original PDF.
+Deleting a session, card, deck, or book is immediate and permanent. Destructive MCP annotations accurately mark those operations. Deleting an imported book never touches its original file.
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md), [SCHEMA.md](docs/SCHEMA.md), and [MCP.md](docs/MCP.md) for the implementation boundaries and version-one contracts.

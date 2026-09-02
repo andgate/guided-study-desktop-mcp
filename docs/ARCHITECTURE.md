@@ -16,7 +16,7 @@ Go MCP service ----> SQLite (canonical state and rendered page BLOBs)
 Bundled converter (Python + PyMuPDF) ----> SQLite transaction
 ```
 
-The converter opens the PDF and SQLite database. It extracts the PDF outline
+The converter opens the book and SQLite database. It extracts the outline
 and inserts the book, lazily rendered page BLOBs, and flat outline in one
 transaction. Failed extraction, rendering, or insertion rolls back the complete
 import. No page-image or CSV staging files are created.

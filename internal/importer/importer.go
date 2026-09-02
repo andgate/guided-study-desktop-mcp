@@ -130,9 +130,9 @@ func knownFailure(diagnostics string) (*store.Error, bool) {
 	message := ""
 	switch failure.Code {
 	case store.CodeOutlineRequired:
-		message = "PDF outline is required."
+		message = "Book outline is required."
 	case store.CodeOutlineUnusable:
-		message = "PDF outline cannot be stored."
+		message = "Book outline cannot be stored."
 	default:
 		return nil, false
 	}
@@ -161,7 +161,7 @@ func conversionError(reason string, cause error, diagnostics string) *store.Erro
 	}
 	return &store.Error{
 		Code:    store.CodeConversionFailed,
-		Message: "PDF import failed.",
+		Message: "Book import failed.",
 		Details: details,
 		Cause:   cause,
 	}

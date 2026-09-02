@@ -12,7 +12,7 @@ import (
 )
 
 type importBookInput struct {
-	FileReference string `json:"file_reference" jsonschema:"Absolute path to the local PDF supplied by the host."`
+	FileReference string `json:"file_reference" jsonschema:"Absolute path to the local PDF or EPUB supplied by the host."`
 	Title         string `json:"title"          jsonschema:"Required display title chosen by the caller."`
 }
 
@@ -47,7 +47,7 @@ func (s *Service) registerBookTools() {
 		&mcp.Tool{
 			Name:        "import_book",
 			Title:       "Import book",
-			Description: "Import a PDF and extract its outline.",
+			Description: "Import a PDF or EPUB and extract its outline.",
 			Annotations: toolAnnotations("Import book", false, false),
 		},
 		func(ctx context.Context, in importBookInput) (store.BookSummary, string, error) {
