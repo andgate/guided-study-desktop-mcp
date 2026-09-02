@@ -6,7 +6,7 @@ This document defines the MCP contract for `guided-study-desktop-mcp`.
 
 The local desktop application exposes one Streamable HTTP MCP endpoint, initially `/mcp`, from the same Go process that owns the tray application and SQLite connection. ChatGPT connects to the configured address and port. STDIO and non-ChatGPT hosts are outside the version-one contract.
 
-The host supplies `import_book.file_reference` as an absolute path to the local PDF.
+The host supplies `import_book.file_reference` as an absolute path to the local PDF or EPUB.
 
 ## Result and error conventions
 
@@ -44,8 +44,8 @@ Stable version-one error codes are:
 | `deck_revision_conflict` | `expected_revision` does not equal the deck metadata revision. |
 | `card_revision_conflict` | `expected_revision` does not equal the logical card's latest revision. |
 | `conversion_failed` | The converter could not run or return a committed book. |
-| `outline_required` | The PDF has no extractable outline. |
-| `outline_unusable` | The extracted PDF outline cannot be stored unchanged. |
+| `outline_required` | The book has no extractable outline. |
+| `outline_unusable` | The extracted outline cannot be stored unchanged. |
 | `storage_error` | SQLite or local storage failed unexpectedly. |
 
 Conflict errors include expected and actual values.
@@ -151,15 +151,17 @@ file_reference: string
 title: string
 ```
 
-The caller supplies the absolute local PDF path and nonblank display title. The
-converter extracts the PDF outline, renders every page, and inserts the complete
+The caller supplies the absolute local book path and nonblank display title. The
+converter extracts the outline, renders every page, and inserts the complete
 book in one SQLite transaction. A missing outline returns `outline_required`.
 An extracted outline that cannot be stored unchanged returns
 `outline_unusable`.
 
 Result: `BookSummary`.
 
-This tool does not retain, modify, or delete the caller's source PDF. It is non-destructive but not read-only.
+This tool does not retain, modify, or delete the caller's source book. It is non-destructive but not read-only.
+
+Reflowable formats such as EPUB are laid out at a fixed page size before rendering. Their page indices are canonical inside this library and do not match a printed edition.
 
 ### `list_books`
 
@@ -187,7 +189,7 @@ Remaining RFC 4180 rows appear in extraction order. The outline helps callers
 locate headings and pages. It does not define page ownership, teaching bounds,
 or checkpoint identity.
 
-This tool never returns page images, source PDF data, or extracted page text. Read-only.
+This tool never returns page images, source book data, or extracted page text. Read-only.
 
 ### `rename_book`
 
@@ -210,7 +212,7 @@ Result:
 { book_id: string, deleted: true }
 ```
 
-This immediately hard-deletes the exact book and all canonical study data owned by it. It never touches the source PDF. Destructive.
+This immediately hard-deletes the exact book and all canonical study data owned by it. It never touches the source book. Destructive.
 
 ## Page batch tools
 
@@ -323,7 +325,7 @@ heading: string
 
 The physical page and nonblank heading form the learner checkpoint. The heading
 is supplied by the agent from the rendered page; the service does not derive or
-validate it against the PDF outline.
+validate it against the book outline.
 
 The call finds the fixed batch containing the checkpoint, then returns the
 following consecutive batch. Batches contain at most five pages and align to

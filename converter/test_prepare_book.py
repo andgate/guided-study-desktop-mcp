@@ -2,6 +2,7 @@ import importlib.util
 import sqlite3
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 import pymupdf
@@ -27,6 +28,43 @@ def make_pdf(path: Path, with_outline: bool = True):
         )
     document.save(path)
     document.close()
+
+
+def make_epub(path: Path):
+    package = (
+        '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" '
+        'version="3.0" unique-identifier="i"><metadata '
+        'xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="i">x'
+        "</dc:identifier><dc:title>Test</dc:title><dc:language>en</dc:language>"
+        '</metadata><manifest><item id="n" href="nav.xhtml" '
+        'media-type="application/xhtml+xml" properties="nav"/><item id="c1" '
+        'href="c1.xhtml" media-type="application/xhtml+xml"/><item id="c2" '
+        'href="c2.xhtml" media-type="application/xhtml+xml"/></manifest>'
+        '<spine><itemref idref="c1"/><itemref idref="c2"/></spine></package>'
+    )
+    nav = (
+        '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" '
+        'xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc">'
+        '<ol><li><a href="c1.xhtml">Opening</a></li>'
+        '<li><a href="c2.xhtml">Closing</a></li></ol></nav></body></html>'
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mimetype", "application/epub+zip", zipfile.ZIP_STORED)
+        archive.writestr(
+            "META-INF/container.xml",
+            '<?xml version="1.0"?><container version="1.0" '
+            'xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>'
+            '<rootfile full-path="c.opf" '
+            'media-type="application/oebps-package+xml"/></rootfiles></container>',
+        )
+        archive.writestr("c.opf", package)
+        archive.writestr("nav.xhtml", nav)
+        for name, heading in (("c1", "Opening"), ("c2", "Closing")):
+            archive.writestr(
+                f"{name}.xhtml",
+                '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml">'
+                f"<body><h1>{heading}</h1><p>Body text.</p></body></html>",
+            )
 
 
 def make_database(path: Path):
@@ -59,16 +97,12 @@ class ConverterTest(unittest.TestCase):
             result = converter.convert(request(source, database))
 
             connection = sqlite3.connect(database)
-            book = connection.execute(
-                "SELECT book_id,title,page_count FROM books"
-            ).fetchone()
+            book = connection.execute("SELECT book_id,title,page_count FROM books").fetchone()
             pages = connection.execute(
-                "SELECT page_index,mime_type,length(image_data) "
-                "FROM book_pages ORDER BY page_index"
+                "SELECT page_index,mime_type,length(image_data) FROM book_pages ORDER BY page_index"
             ).fetchall()
             outline = connection.execute(
-                "SELECT outline_index,title,page_index "
-                "FROM book_outline ORDER BY outline_index"
+                "SELECT outline_index,title,page_index FROM book_outline ORDER BY outline_index"
             ).fetchall()
             connection.close()
 
@@ -125,6 +159,39 @@ class ConverterTest(unittest.TestCase):
             count = connection.execute("SELECT count(*) FROM books").fetchone()[0]
             connection.close()
             self.assertEqual(count, 0)
+
+    def test_stores_reflowable_book(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "book.epub"
+            database = root / "book.db"
+            make_epub(source)
+            make_database(database)
+
+            result = converter.convert(request(source, database))
+
+            connection = sqlite3.connect(database)
+            page_count = connection.execute("SELECT page_count FROM books").fetchone()[0]
+            pages = connection.execute("SELECT count(*) FROM book_pages").fetchone()[0]
+            outline = connection.execute(
+                "SELECT title FROM book_outline ORDER BY outline_index"
+            ).fetchall()
+            connection.close()
+
+            self.assertEqual(page_count, result["page_count"])
+            self.assertEqual(pages, page_count)
+            self.assertEqual([row[0] for row in outline], ["Opening", "Closing"])
+
+    def test_rejects_unsupported_format(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "book.txt"
+            database = root / "book.db"
+            source.write_text("not a book", encoding="utf-8")
+            make_database(database)
+
+            with self.assertRaises(ValueError):
+                converter.convert(request(source, database))
 
 
 if __name__ == "__main__":

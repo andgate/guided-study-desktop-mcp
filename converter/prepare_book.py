@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render and store one PDF atomically."""
+"""Render and store one book atomically."""
 
 from __future__ import annotations
 
@@ -20,6 +20,12 @@ DEFAULT_DPI = 200
 MIN_JPEG_QUALITY = 1
 MAX_JPEG_QUALITY = 100
 DEFAULT_JPEG_QUALITY = 90
+
+ACCEPTED_SUFFIXES = frozenset({".pdf", ".epub"})
+
+# Reflowable formats need a page size before rendering.
+REFLOW_PAGE_SIZE = "letter"
+REFLOW_FONT_SIZE = 11
 
 MIME_TYPE = "image/jpeg"
 BUSY_TIMEOUT_MS = 5000
@@ -64,39 +70,44 @@ def outline_rows(
 def check_request(
     request: dict[str, Any],
 ) -> tuple[Path, Path, str, int, int]:
-    pdf_path = Path(request["file_reference"]).resolve()
+    book_path = Path(request["file_reference"]).resolve()
     database_path = Path(request["database_path"]).resolve()
     title = str(request["title"]).strip()
     render = request["render"]
     dpi = int(render["dpi"])
     quality = int(render["jpeg_quality"])
 
-    if pdf_path.suffix.lower() != ".pdf" or not pdf_path.is_file():
-        raise ValueError(f"Source is not a readable PDF: {pdf_path}")
+    if book_path.suffix.lower() not in ACCEPTED_SUFFIXES or not book_path.is_file():
+        raise ValueError(f"Source is not a readable book: {book_path}")
     if not title:
         raise ValueError("Title must not be blank")
     if not MIN_DPI <= dpi <= MAX_DPI:
         raise ValueError(f"DPI must be between {MIN_DPI} and {MAX_DPI}")
     if not MIN_JPEG_QUALITY <= quality <= MAX_JPEG_QUALITY:
-        raise ValueError(
-            f"JPEG quality must be between {MIN_JPEG_QUALITY} and {MAX_JPEG_QUALITY}"
-        )
+        raise ValueError(f"JPEG quality must be between {MIN_JPEG_QUALITY} and {MAX_JPEG_QUALITY}")
 
-    return pdf_path, database_path, title, dpi, quality
+    return book_path, database_path, title, dpi, quality
 
 
 def convert(request: dict[str, Any]) -> dict[str, Any]:
-    pdf_path, database_path, title, dpi, quality = check_request(request)
+    book_path, database_path, title, dpi, quality = check_request(request)
     book_id = str(uuid.uuid4())
 
-    with pymupdf.open(pdf_path) as document:
+    with pymupdf.open(book_path) as document:
+        # Reflowable books paginate from the chosen layout.
+        if document.is_reflowable:
+            document.layout(
+                rect=pymupdf.paper_rect(REFLOW_PAGE_SIZE),
+                fontsize=REFLOW_FONT_SIZE,
+            )
+
         page_count = document.page_count
         if page_count < 1:
-            raise ValueError("PDF has no pages")
+            raise ValueError("Book has no pages")
 
         outline = document.get_toc(simple=True)
         if not outline:
-            raise ImportFailure(OUTLINE_REQUIRED, "PDF outline is required.")
+            raise ImportFailure(OUTLINE_REQUIRED, "Book outline is required.")
 
         connection = sqlite3.connect(database_path, isolation_level=None)
         try:
@@ -123,7 +134,7 @@ def convert(request: dict[str, Any]) -> dict[str, Any]:
                 except sqlite3.IntegrityError as exc:
                     raise ImportFailure(
                         OUTLINE_UNUSABLE,
-                        "PDF outline cannot be stored.",
+                        "Book outline cannot be stored.",
                     ) from exc
                 connection.commit()
             except Exception:
