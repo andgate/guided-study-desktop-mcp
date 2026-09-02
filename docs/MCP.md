@@ -4,7 +4,7 @@
 
 This document defines the MCP contract for `guided-study-desktop-mcp`.
 
-The local Windows application exposes one Streamable HTTP MCP endpoint, initially `/mcp`, from the same Go process that owns the tray application and SQLite connection. ChatGPT connects to the configured address and port. STDIO and non-ChatGPT hosts are outside the version-one contract.
+The local desktop application exposes one Streamable HTTP MCP endpoint, initially `/mcp`, from the same Go process that owns the tray application and SQLite connection. ChatGPT connects to the configured address and port. STDIO and non-ChatGPT hosts are outside the version-one contract.
 
 The host supplies `import_book.file_reference` as an absolute path to the local PDF.
 

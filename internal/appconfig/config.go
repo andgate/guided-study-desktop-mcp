@@ -7,15 +7,19 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
 const (
-	defaultListenAddress     = "127.0.0.1:7331"
-	defaultDataDirectory     = "GuidedStudy"
-	defaultDatabaseFilename  = "guided-study.db"
-	defaultConverterFilename = "pdf-converter.exe"
-	defaultHeadless          = false
+	defaultListenAddress    = "127.0.0.1:7331"
+	defaultDataDirectory    = "GuidedStudy"
+	defaultDatabaseFilename = "guided-study.db"
+	defaultConverterName    = "pdf-converter"
+	defaultHeadless         = false
+
+	windowsGOOS      = "windows"
+	windowsExeSuffix = ".exe"
 )
 
 type Config struct {
@@ -57,10 +61,10 @@ func Parse(args []string) (Config, error) {
 }
 
 func defaultConfig() (Config, error) {
-	// Store application data in the current user's local app-data directory.
-	local := os.Getenv("LOCALAPPDATA")
-	if local == "" {
-		return Config{}, errors.New("LOCALAPPDATA is not set")
+	// Store application data in the current user's data directory.
+	base, err := userDataDirectory()
+	if err != nil {
+		return Config{}, err
 	}
 
 	// Find the PDF converter beside the desktop executable.
@@ -71,10 +75,33 @@ func defaultConfig() (Config, error) {
 
 	return Config{
 		Listen:        defaultListenAddress,
-		DatabasePath:  filepath.Join(local, defaultDataDirectory, defaultDatabaseFilename),
-		ConverterPath: filepath.Join(filepath.Dir(exe), defaultConverterFilename),
+		DatabasePath:  filepath.Join(base, defaultDataDirectory, defaultDatabaseFilename),
+		ConverterPath: filepath.Join(filepath.Dir(exe), converterFilename()),
 		Headless:      defaultHeadless,
 	}, nil
+}
+
+// userDataDirectory returns the per-user data root.
+func userDataDirectory() (string, error) {
+	// Windows keeps application data out of the roaming profile.
+	if runtime.GOOS == windowsGOOS {
+		local := os.Getenv("LOCALAPPDATA")
+		if local == "" {
+			return "", errors.New("LOCALAPPDATA is not set")
+		}
+		return local, nil
+	}
+
+	// macOS uses Application Support, Linux uses XDG config home.
+	return os.UserConfigDir()
+}
+
+// converterFilename returns the bundled converter name.
+func converterFilename() string {
+	if runtime.GOOS == windowsGOOS {
+		return defaultConverterName + windowsExeSuffix
+	}
+	return defaultConverterName
 }
 
 // Validate checks required values and paths.
